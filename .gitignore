@@ -1,0 +1,23 @@
+# ROS2 build & install
+build/
+install/
+log/
+LOG/
+workspace/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+
+# VS Code
+.vscode/
+
+# ROS bag recordings
+*.db3
+*.bag
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db
