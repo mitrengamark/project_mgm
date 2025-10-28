@@ -1,0 +1,12 @@
+Metric,Value,Unit,Target,Status
+Scan_Frequency_Avg,0.9,Hz,10,FAIL
+Scan_Frequency_Min,0.129,s,-,INFO
+Scan_Frequency_Max,1.460,s,-,INFO
+Scan_Frequency_StdDev,0.34,s,<0.1,FAIL
+Recording_Duration,6,seconds,10,PARTIAL
+Topics_Recorded,7,count,7,PASS
+Node_Crashes,0,count,0,PASS
+Objects_Detected,Yes,boolean,Yes,PASS
+Filtered_Scan_Published,Yes,boolean,Yes,PASS
+Markers_Published,Yes,boolean,Yes,PASS
+System_Stable,Yes,boolean,Yes,PASS

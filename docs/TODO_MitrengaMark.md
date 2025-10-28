@@ -24,12 +24,12 @@
 
 ## 🧩 Feladataim összefoglalva
 
-| Fázis | Cél | Részfeladatok | Eredmény |
-|-------|-----|----------------|-----------|
-| 1️⃣ Tesztkörnyezet előkészítés | ROS2 workspace és tesztadatok előkészítése | Build, rosbag futtatás, RViz megjelenítés | működő tesztkörnyezet |
-| 2️⃣ Tesztelési terv kidolgozása | Szcenáriók, metrikák, futtatási terv | 3 különböző teszteset dokumentálása | Overleaf PDF (2–3 oldal) |
-| 3️⃣ Tesztfuttatás és adatgyűjtés | Bag replay, CPU/latency mérés, screenshotok | Futtatási napló, ábrák, metrikák | teszt report és ábrák |
-| 4️⃣ Prezentáció | Összefoglaló 6–7 perces bemutató | Ábrák, mérési eredmények, konklúzió | ppt/beamer export Overleaf-ből |
+| Fázis | Cél | Részfeladatok | Eredmény | Állapot |
+|-------|-----|----------------|-----------|---------|
+| 1️⃣ Tesztkörnyezet előkészítés | ROS2 workspace és tesztadatok előkészítése | Build, rosbag futtatás, RViz megjelenítés | működő tesztkörnyezet | ✅ 100% |
+| 2️⃣ Tesztelési terv kidolgozása | Szcenáriók, metrikák, futtatási terv | 3 különböző teszteset dokumentálása | Overleaf PDF (2–3 oldal) | 🔶 30% |
+| 3️⃣ Tesztfuttatás és adatgyűjtés | Bag replay, CPU/latency mérés, screenshotok | Futtatási napló, ábrák, metrikák | teszt report és ábrák | 🔶 10% |
+| 4️⃣ Prezentáció | Összefoglaló 6–7 perces bemutató | Ábrák, mérési eredmények, konklúzió | ppt/beamer export Overleaf-ből | ⏳ 0% |
 
 ---
 
@@ -37,7 +37,7 @@
 
 **Cél:** a ROS2 rendszer futtatása, a workspace és a szimulációs adatforrások ellenőrzése.
 
-### 1.1 Build és környezet inicializálás
+### 1.1 Build és környezet inicializálás ✅
 
 ```bash
 cd ~/codes/mgm/project_mgm
@@ -45,7 +45,9 @@ colcon build --symlink-install
 source install/setup.bash
 ```
 
-### 1.2 Alap teszt – LIDAR node-ok és launch fájl
+**Státusz:** ✅ Sikeres - 29 csomag lefordult
+
+### 1.2 Alap teszt – LIDAR node-ok és launch fájl ✅
 
 ```bash
 ros2 launch lidar_filter lidar_filter.launch.py
@@ -54,31 +56,50 @@ ros2 topic list
 ros2 topic echo /scan
 ```
 
-### 1.3 Rosbag lejátszás és RViz megjelenítés
+**Státusz:** ✅ A `lidar_filter` csomag létrehozva és működik
+- Node: `lidar_filter_node` ✅
+- Topicok: `/scan`, `/filtered_scan`, `/objects`, `/object_markers`, `/map` ✅
+
+### 1.3 Rosbag lejátszás és RViz megjelenítés ✅
 
 ```bash
 ros2 bag play data/test_scene.bag --clock
 ros2 run rviz2 rviz2
 ```
 
-### 1.4 Ellenőrizd:
+**Státusz:** ✅ Kész!
+- ✅ RViz2 indítható
+- ✅ Gazebo szimuláció fut TurtleBot3-mal
+- ✅ RViz konfiguráció létrehozva és mentve (`config/lidar_filter_rviz.rviz`)
+- ✅ Complete system launch fájl készített
+- ⏳ Rosbag fájl még nem készült
 
-- `/scan` → LIDAR adatfolyam látható
-- `/filtered_scan`, `/objects`, `/map` topicok megjelennek
-- `rqt_graph`-ban látszik a node-topology
+### 1.4 Ellenőrizd: ✅
 
-### 1.5 Logolás és mentés
+- ✅ `/scan` → LIDAR adatfolyam látható
+- ✅ `/filtered_scan`, `/objects`, `/map` topicok megjelennek
+- ✅ `rqt_graph` elindítva - Node topológia vizualizálható
+
+### 1.5 Logolás és mentés ✅
 
 ```bash
 mkdir -p ~/codes/mgm/project_mgm/results
 ros2 bag record -a -o results/test_run1
 ```
 
+**Státusz:** ✅ Első teszteset (T1) rögzítve!
+- ✅ T1 (statikus környezet) rosbag rögzítve
+- ✅ Metrikák gyűjtve (CSV formátum)
+- ✅ Teszt jegyzet készítve
+- ⏳ T2 és T3 tesztesetek következnek
+
 ---
 
 ## 🧪 2. Tesztelési terv kidolgozása
 
 **Cél:** meghatározni, mit, hogyan és mivel fogsz mérni.
+
+**Státusz:** ⏳ Még nem kezdődött el
 
 ### 2.1 Tesztszcenáriók
 
@@ -108,6 +129,8 @@ ros2 bag record -a -o results/test_run1
 ## 📊 3. Tesztfuttatás és adatgyűjtés
 
 **Cél:** a fejlesztett node-ok (detektálás, követés, térképezés) valós működésének mérése.
+
+**Státusz:** ⏳ Még nem kezdődött el
 
 ### 3.1 Futtatás
 
@@ -144,6 +167,8 @@ import numpy as np
 
 **Cél:** bemutatni a teljes projekt eredményét a három rész (elmélet–architektúra–teszt) mentén.
 
+**Státusz:** ⏳ Még nem kezdődött el
+
 ### 4.1 Tartalom
 
 - **Bevezetés:** projekt célja, bemenet–kimenet (1 perc)
@@ -160,25 +185,86 @@ import numpy as np
 
 
 ## ✅ Fájlstruktúra
-```css
+
+```
 project_mgm/
- ├── src/
- │   ├── lidar_filter/
- │   │   ├── lidar_filter_node.py
- │   │   └── launch/lidar_filter.launch.py
- ├── tests/
- │   ├── test_cases.md
- │   ├── test_results/
- │   │   ├── run1.png
- │   │   ├── run2.png
- │   │   └── metrics.csv
- ├── results/
- │   ├── run1/
- │   ├── run2/
- │   └── summary.txt
- ├── docs/
- │   ├── TODO_MitrengaMark.md
- │   ├── TesztelésiTerv_MitrengaMark.pdf
- │   └── Presentation_MitrengaMark.pdf
- └── README.md
- ```
+├── src/
+│   └── mgm_gyak/
+│       └── lidar_filter/                    ✅ Létrehozva
+│           ├── lidar_filter/
+│           │   ├── __init__.py              ✅
+│           │   └── lidar_filter_node.py     ✅ LIDAR objektum detektálás
+│           ├── launch/
+│           │   ├── lidar_filter.launch.py   ✅ Egyszerű launch
+│           │   └── complete_system.launch.py ✅ ÚJ! Teljes rendszer launch
+│           ├── config/
+│           │   └── lidar_filter_rviz.rviz   ✅ ÚJ! RViz konfiguráció
+│           ├── resource/
+│           │   └── lidar_filter             ✅
+│           ├── package.xml                   ✅ ROS 2 package
+│           ├── setup.py                      ✅ Python setup
+│           └── README.md                     ✅ ÚJ! Csomag dokumentáció
+├── install/lidar_filter/                     ✅ Build output
+│   └── bin/lidar_filter_node                 ✅ Executable itt van!
+├── config/
+│   └── lidar_filter_rviz.rviz               ✅ ÚJ! RViz konfiguráció (másolat)
+├── tests/                                    ✅ Tesztek megkezdve!
+│   ├── test_cases.md                        ✅ Tesztesetek dokumentálva (T1, T2, T3)
+│   └── test_results/
+│       ├── T1_static/                       ✅ T1 KÉSZ!
+│       │   ├── rosbag/
+│       │   │   └── test_run1_static/        ✅ Rosbag rögzítve (~6 sec)
+│       │   ├── screenshots/                 ⏳ Következik
+│       │   ├── metrics_t1.csv               ✅ Metrikák CSV-ben
+│       │   └── notes_t1.md                  ✅ Teszt jegyzet
+│       ├── T2_moving/                       ⏳ Előkészítve
+│       ├── T3_stress/                       ⏳ Előkészítve
+│       └── TESZT_OSSZEFOGLALO.md            ✅ ÚJ! Összefoglaló
+├── results/                                  ✅ Mappa létrehozva
+│   └── (rosbag fájlok ide kerülnek)
+└── docs/
+    ├── TODO_MitrengaMark.md                 ✅ Ez a fájl (frissítve)
+    ├── FUTTATAS_UTMUTATO.md                 ✅ Futtatási útmutató (v2.0)
+    ├── MUNKA_OSSZEFOGLALO_2025-10-28.md     ✅ ÚJ! Mai munkamenet összefoglalója
+    ├── TesztelésiTerv_MitrengaMark.pdf      ⏳ Overleaf
+    └── Presentation_MitrengaMark.pdf        ⏳ Prezentáció
+```
+
+---
+
+## 📚 Dokumentációs fájlok
+
+1. **[README.md](../README.md)** - Projekt főoldal, gyors áttekintés
+2. **[TODO_MitrengaMark.md](TODO_MitrengaMark.md)** (ez a fájl) - Részletes feladatlista, státuszok
+3. **[FUTTATAS_UTMUTATO.md](FUTTATAS_UTMUTATO.md)** - Lépésről-lépésre rendszerindítási útmutató (v2.0)
+4. **[MUNKA_OSSZEFOGLALO_2025-10-28.md](MUNKA_OSSZEFOGLALO_2025-10-28.md)** - Mai munkamenet összefoglalója
+
+**Mindig ezeket a fájlokat frissítsd, amikor egy feladat elkészül!** ✅
+
+## 📝 Állapot (2025. október 28. - 23:55)
+
+### ✅ Kész feladatok:
+- ✅ **ROS 2 környezet beállítva** - Jazzy build sikeres (29 csomag)
+- ✅ **lidar_filter csomag létrehozva** - Objektum detektálás implementálva
+- ✅ **Node működik** - `/filtered_scan`, `/objects`, `/object_markers`, `/map` topicok publikálva
+- ✅ **Gazebo szimuláció fut** - TurtleBot3 Waffle modell LIDAR-ral
+- ✅ **RViz2 konfiguráció** - Display-ek beállítva és .rviz fájl mentve
+- ✅ **Complete system launch** - Egy paranccsal indul minden komponens
+- ✅ **rqt_graph vizualizáció** - Node topológia megtekinthető
+- ✅ **Tesztesetek dokumentálva** - T1, T2, T3 szcenáriók leírva
+- ✅ **T1 teszt végrehajtva** - Rosbag rögzítve, metrikák gyűjtve
+- ✅ **Dokumentáció** - README, TODO, Futtatási útmutató, Teszt jegyzet
+
+### ⏳ Következő lépések (prioritási sorrendben):
+1. **T2 és T3 tesztek futtatása** - Mozgó robot és stresszteszt
+2. **Screenshot készítés** - RViz, rqt_graph, Gazebo képernyőmentések
+3. **Gazebo LIDAR konfiguráció javítása** - Frekvencia növelése
+4. **Metrikák elemzése** - CSV → grafikonok, táblázatok
+5. **Tesztelési terv írása** - Overleaf dokumentum kezdése (Fázis 2)
+
+### 🔧 Technikai megjegyzések:
+- A `lidar_filter_node` executable a `install/lidar_filter/bin/` mappában található
+- Conda környezetet NE aktiváld ROS 2 használatakor (rendszer Python kell)
+- Gazebo indítás: `export TURTLEBOT3_MODEL=waffle` kell előtte
+- Teljes rendszer indítás: `ros2 launch lidar_filter complete_system.launch.py`
+- ⚠️ **LIDAR frekvencia alacsony** (~0.9 Hz helyett 10 Hz) - Gazebo konfiguráció javítandó!
