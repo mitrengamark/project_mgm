@@ -1,0 +1,33 @@
+<?xml version="1.0" ?>
+<launch>
+
+	<arg name="gui" 				default="true"/>
+	<!-- Robot calibration:  AGENT1-->
+	<arg name="agent" 				default="agent1"/>
+	<arg name="use_keyboard" 		default="false"/>
+	<arg name="x" 					default="0.0"/>
+	<arg name="y" 					default="0.0"/>
+
+	<!-- GAZEBO -->
+	<include file="$(find-pkg-share hamster_vehicle_gazebo)/launch/hamster_world.launch">
+		<arg name="gui" 			value="$(var gui)"/>
+		<arg name="world" 			value="$(find-pkg-share hamster_vehicle_gazebo)/worlds/cogni_office.world"/>
+	</include>
+	
+	<!-- RVIZ -->
+	<node pkg="rviz2" exec="rviz2" name="rviz" output="screen" args="-d $(find-pkg-share hamster_vehicle)/rviz/hamsters.rviz"/>
+
+	<!-- AGENT1 -->
+	<include file="$(find-pkg-share hamster_vehicle_gazebo)/launch/hamster_vehicle_spawner.launch">
+		<arg name="agent" 			value="$(var agent)"/>
+		<arg name="use_keyboard" 	value="$(var use_keyboard)"/>
+		<arg name="x" 				value="$(var x)"/>
+		<arg name="y" 				value="$(var y)"/>
+		<arg name="is_publishTF" 	value="true"/>
+		<arg name="tf_target_topic" value="odom/ground_truth"/>
+		<arg name="robot_version" 	value="V6"/>
+	</include>
+
+	<node name="transform_map_odom" pkg="tf2_ros" exec="static_transform_publisher" args=" --x 0.0 --y 0.0 --z 0.0 --roll 0.0 --pitch 0.0 --yaw 0.0 --frame-id map --child-frame-id $(var agent)/odom"/>
+
+</launch>

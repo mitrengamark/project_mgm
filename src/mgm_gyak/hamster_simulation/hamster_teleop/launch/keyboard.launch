@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<launch> 
+  <arg name="agent" default="agent1"/>
+
+  <node name="hamster_teleop_node" pkg="hamster_teleop" exec="keyboard.py" namespace="$(arg agent)" output="screen">
+  	<param name="max_speed" 			value="0.5"/>
+  	<param name="max_steering_angle" 	value="0.3"/>
+  	<param name="topic" 				value="/$(var agent)/ackermann_cmd"/>
+  	<param name="frame" 				value="$(var agent)/base_link"/>
+  </node>
+ 
+</launch>

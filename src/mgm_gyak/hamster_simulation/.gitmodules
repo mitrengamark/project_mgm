@@ -1,0 +1,3 @@
+[submodule "hamster_vehicle_description"]
+	path = hamster_vehicle_description
+	url = ../hamster_vehicle_description.git

@@ -1,0 +1,5 @@
+/**:
+  ros__parameters:
+    path_topic_name: /path
+    max_size: 500
+    use_sim_time: true

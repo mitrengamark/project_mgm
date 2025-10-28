@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<robot name="rear_wheel" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  
+  <!-- Wheels -->
+  <xacro:property name="wheel_radius" value="0.029" /> 
+  <xacro:property name="wheel_height" value="0.02" />
+  <xacro:property name="wheel_mass" value="0.1" /> <!-- in kg-->
+  
+  <xacro:macro name="cylinder_inertia" params="m r h">
+    <inertia  ixx="${m*(3*r*r+h*h)/12}" ixy="0" ixz="0"
+              iyy="${m*(3*r*r+h*h)/12}" iyz="0"
+              izz="${m*r*r/2}" /> 
+  </xacro:macro>
+  
+  <!--fr : front, rear ; lr: left, right -->
+  <xacro:macro name="rear_wheel" params="agent fr lr parent origin_x origin_y origin_z">
+    <link name="${agent}/${fr}_${lr}_wheel">
+      <visual>
+        <origin xyz="0 0 0" rpy="1.57 0 0" /> 
+        <geometry>
+          <mesh filename="package://hamster_vehicle_description/meshes/hamster_wheel.dae" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="1.57 0 0" />
+        <geometry>
+          <cylinder length="0.008" radius="${wheel_radius}" />
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="${wheel_mass}" />
+        <origin xyz="0 0 0" rpy="1.57 0 0" />
+        <xacro:cylinder_inertia  m="${wheel_mass}" r="${wheel_radius}" h="${wheel_height}" />
+      </inertial>
+    </link>
+
+    <!-- <gazebo reference="${fr}_${lr}_wheel">
+      <mu1>100</mu1>
+      <mu2>100</mu2>
+      <dampingFactor>0.1</dampingFactor>
+      <minDepth>0.01</minDepth>
+      <selfCollide>false</selfCollide>
+      <maxContacts>20</maxContacts>
+    </gazebo> -->
+
+    <gazebo reference="${agent}/${fr}_${lr}_wheel">
+      <mu1>0.7</mu1>
+      <mu2>0.7</mu2>
+      <kp>500000.0</kp>
+      <kd>10.0</kd>
+      <minDepth>0.002</minDepth>
+      <maxVel>0.1</maxVel>
+      <fdir1>1 0 0</fdir1>
+      <!-- <material>Gazebo/FlatBlack</material> -->
+      <maxContacts>20</maxContacts>
+    </gazebo>
+
+    <joint name="${agent}_${fr}_${lr}_wheel_joint" type="continuous">
+      <parent link="${parent}"/>
+      <child link="${agent}/${fr}_${lr}_wheel"/>
+      <origin xyz="${origin_x} ${origin_y} ${origin_z}" rpy="0 0 0" /> 
+      <axis xyz="0 1 0"/>
+      <limit effort="-1" velocity="-1"/>
+      <!-- <dynamics friction="0.5" damping="0.7" /> -->
+    </joint>
+  
+  </xacro:macro>
+</robot>

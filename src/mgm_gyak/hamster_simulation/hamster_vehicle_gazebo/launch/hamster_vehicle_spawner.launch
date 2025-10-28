@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<launch>
+	<arg name="agent" 				default="agent2"/>
+	<arg name="cmd_timeout" 		default="0.5"/>
+	<arg name="use_joystick" 		default="false" />
+	<arg name="use_keyboard" 		default="false" />
+	<arg name="joystick_dev" 		default="/dev/input/js0"/>
+	<arg name="x" 					default="0"/>
+	<arg name="y" 					default="1.0"/>
+	<arg name="is_publishTF" 		default="true"/>
+	<arg name="tf_target_topic" 	default="odom/raw"/>
+	<arg name="robot_version" 		default="V7"/>
+
+
+	<include file="$(find-pkg-share hamster_vehicle_description)/launch/hamster_agent.launch">
+		<arg name="agent" 			value="$(var agent)"/>
+		<arg name="x" 				value="$(var x)"/>
+		<arg name="y" 				value="$(var y)"/>
+		<arg name="robot_version" 	value="$(var robot_version)"/>
+		<arg name="is_publishTF" 	value="$(var is_publishTF)"/>
+		<arg name="tf_target_topic" value="$(var tf_target_topic)"/>
+		<arg name="simulation" 		value="true"/>
+	</include>
+
+	<group if="$(var use_joystick)">
+		<include file="$(find-pkg-share hamster_teleop)/launch/joystick.launch">
+			<arg name="agent" 			value="$(var agent)"/>
+			<arg name="scale_linear" 	value="2"/>
+			<arg name="scale_angular" 	value="0.5"/>
+			<arg name="dev" 			value="$(var joystick_dev)"/>
+		</include>
+	</group>
+		
+	<group if="$(var use_keyboard)">
+		<include file="$(find-pkg-share hamster_teleop)/launch/keyboard.launch">
+			<arg name="agent" 			value="$(var agent)"/>
+		</include>
+	</group>
+		 
+</launch>

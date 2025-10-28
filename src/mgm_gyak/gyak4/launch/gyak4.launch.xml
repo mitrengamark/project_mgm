@@ -1,0 +1,20 @@
+<launch>
+
+    <arg name="x_pose" default="1.0"/>
+    <arg name="y_pose" default="2.0"/>
+
+    <!-- Start turtlebot3 -->
+    <include file="$(find-pkg-share turtlebot3_gazebo)/launch/turtlebot3_world.launch.py">
+        <arg name="use_sim_time" value="true"/>
+        <arg name="x_pose" value="$(var x_pose)"/>
+        <arg name="y_pose" value="$(var y_pose)"/>
+    </include>
+
+    <!-- Start path node -->
+    <node pkg="gyak3" exec="path.py" name="path_node" output="screen">
+        <param from="$(find-pkg-share gyak4)/config/path_param.yaml"/>
+    </node>
+
+    <!-- Start Rviz2 -->
+    <node pkg="rviz2" exec="rviz2" name="rviz2" args="-d $(find-pkg-share gyak4)/rviz/gyak4.rviz"/>
+</launch>
