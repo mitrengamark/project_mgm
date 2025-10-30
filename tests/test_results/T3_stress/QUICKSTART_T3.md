@@ -57,7 +57,10 @@ ros2 service call /delete_entity gazebo_msgs/srv/DeleteEntity "{name: 'box1'}"
 cd /home/mark/codes/mgm/project_mgm/tests/test_results/T3_stress/rosbag
 source /home/mark/codes/mgm/project_mgm/install/setup.bash
 
-ros2 bag record -o test_run_stress \
+# Ha már létezik a mappa, töröld:
+# rm -rf test_run_stress_v2
+
+ros2 bag record -o test_run_stress_v2 --topics \
   /scan \
   /filtered_scan \
   /objects \
@@ -67,7 +70,7 @@ ros2 bag record -o test_run_stress \
   /cmd_vel
 ```
 
-**Futtatási idő:** 60-120 sec
+**Futtatási idő:** 90-120 sec (T3 v2 folyamatos spawning teszthez)
 
 ---
 

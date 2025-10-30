@@ -11,14 +11,14 @@ echo "Objektumok folyamatosan spawn-olnak és tűnnek el."
 echo "Nyomj Ctrl+C a leállításhoz!"
 echo ""
 
-# Ellenőrizzük, hogy fut-e a Gazebo
-if ! ros2 service list | grep -q "/gazebo"; then
+# Ellenőrizzük, hogy fut-e a Gazebo (Gazebo Harmonic)
+if ! pgrep -f "gz sim" > /dev/null; then
     echo "❌ HIBA: Gazebo nem fut!"
     echo "Indítsd el először: ros2 launch lidar_filter optimized_system.launch.py"
     exit 1
 fi
 
-echo "✅ Gazebo fut, spawning indítása..."
+echo "✅ Gazebo (Harmonic) fut, spawning indítása..."
 echo ""
 
 # Számláló az egyedi entity ID-khez
@@ -65,12 +65,21 @@ while true; do
     
     entity_name="stress_${type_name}_${counter}"
     
-    # Spawning
+    # Spawning (Gazebo Harmonic SDF format)
     echo "[$(date +%H:%M:%S)] Spawning: $entity_name at ($x, $y, $z)"
-    ros2 run gazebo_ros spawn_entity.py \
-        -entity "$entity_name" \
-        -database "$model" \
-        -x "$x" -y "$y" -z "$z" \
+    
+    # SDF model különbözik box vs cylinder esetén
+    if [ "$model" == "unit_box" ]; then
+        sdf_geometry="<box><size>0.5 0.5 0.5</size></box>"
+    else
+        sdf_geometry="<cylinder><radius>0.25</radius><length>0.5</length></cylinder>"
+    fi
+    
+    gz service -s /world/default/create \
+        --reqtype gz.msgs.EntityFactory \
+        --reptype gz.msgs.Boolean \
+        --timeout 5000 \
+        --req "sdf: '<model name=\"$entity_name\"><static>false</static><pose>$x $y $z 0 0 0</pose><link name=\"link\"><inertial><mass>1.0</mass></inertial><collision name=\"collision\"><geometry>$sdf_geometry</geometry></collision><visual name=\"visual\"><geometry>$sdf_geometry</geometry><material><ambient>0 1 0 1</ambient><diffuse>0 1 0 1</diffuse></material></visual></link></model>'" \
         > /dev/null 2>&1 &
     
     spawn_pid=$!
@@ -85,9 +94,14 @@ while true; do
     # Várakozás
     sleep $lifetime
     
-    # Objektum törlése
+    # Objektum törlése (Gazebo Harmonic)
     echo "   ↳ Törlés: $entity_name"
-    ros2 service call /delete_entity gazebo_msgs/srv/DeleteEntity "{name: '$entity_name'}" > /dev/null 2>&1 &
+    gz service -s /world/default/remove \
+        --reqtype gz.msgs.Entity \
+        --reptype gz.msgs.Boolean \
+        --timeout 2000 \
+        --req "name: '$entity_name', type: MODEL" \
+        > /dev/null 2>&1 &
     
     # Számláló növelése
     counter=$((counter + 1))

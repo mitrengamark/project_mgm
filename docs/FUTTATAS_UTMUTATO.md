@@ -2,8 +2,8 @@
 
 **Projekt:** LIDAR alapú objektum detektálás és követés  
 **Készítette:** Mitrenga Márk  
-**Utolsó frissítés:** 2025. október 29. 23:15  
-**Verzió:** 3.0 (Optimalizált)
+**Utolsó frissítés:** 2025. október 30. 19:30  
+**Verzió:** 3.1 (T3 Stresszteszt eredményekkel)
 
 ---
 
@@ -195,9 +195,20 @@ ros2 bag play test_run1 --clock
 ros2 bag info test_run1
 ```
 
-**T2 teszt eredmények (v2):**
+**Teszt eredmények összefoglalója:**
+
+**T2 v2 (mozgó robot):**
 - Időtartam: 276.7 sec (~4.6 perc)
 - Méret: 15.2 MiB
+- Scan rate: 0.86 Hz
+- Detektálás: 237/238 (99.6%)
+
+**T3 v2 (statikus robot, stresszteszt):**
+- Időtartam: 81.7 sec (~1.4 perc)
+- Méret: 1.3 MiB
+- Scan rate: 1.11 Hz (+29% vs T2!) 🚀
+- Detektálás: 89/90 (98.9%)
+- Objektumok: ~3-5 egyidejűleg
 - Összes üzenet: 50,338
 - Detektált objektumok: 237 (99.6% siker!)
 
@@ -343,10 +354,20 @@ ros2 interface show geometry_msgs/msg/PoseArray
 
 ---
 
-## 🎉 Legújabb Eredmények (T2 teszt v2)
+## 🎉 Tesztelési Eredmények
 
+### T2 Teszt v2 - Mozgó Robot ✅
 - ✅ **237 objektum detektálva** (99.6% sikeres!)
 - ✅ **Rosbag teljes:** 276.7 sec, 50,338 üzenet, 15.2 MiB
+- ✅ **Scan rate:** 0.86 Hz
+- ✅ **Topic-ok:** /scan, /filtered_scan, /objects, /object_markers, /odom, /tf, /cmd_vel
+
+### T3 Teszt v2 - Stresszteszt (Több Objektum) ✅
+- ✅ **89 objektum detektálva** (98.9% sikeres!)
+- ✅ **Rosbag teljes:** 81.7 sec, 1,442 üzenet, 1.3 MiB
+- ✅ **Scan rate:** 1.11 Hz (+29% javulás vs T2!) 🚀
+- ✅ **Objektumok:** ~3-5 egyidejűleg (manuális spawning)
+- ✅ **Környezet:** Statikus robot (nincs navigációs overhead)
 - ✅ **RViz optimalizálva:** Csak 3 TF frame, tisztább vizualizáció
 - ✅ **Topic nevek javítva:** `/filtered_scan`, `/objects`, `/object_markers`
 - ⚠️ **CPU 100%:** WSL limitáció (elfogadható teszteléshez)

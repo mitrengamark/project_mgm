@@ -27,9 +27,9 @@
 | Fázis | Cél | Részfeladatok | Eredmény | Állapot |
 |-------|-----|----------------|-----------|---------|
 | 1️⃣ Tesztkörnyezet előkészítés | ROS2 workspace és tesztadatok előkészítése | Build, rosbag futtatás, RViz megjelenítés | működő tesztkörnyezet | ✅ 100% |
-| 2️⃣ Tesztelési terv kidolgozása | Szcenáriók, metrikák, futtatási terv | 3 különböző teszteset dokumentálása | Overleaf PDF (2–3 oldal) | 🔶 40% |
-| 3️⃣ Tesztfuttatás és adatgyűjtés | Bag replay, CPU/latency mérés, screenshotok | Futtatási napló, ábrák, metrikák | teszt report és ábrák | 🔶 60% |
-| 4️⃣ Prezentáció | Összefoglaló 6–7 perces bemutató | Ábrák, mérési eredmények, konklúzió | ppt/beamer export Overleaf-ből | ⏳ 0% |
+| 2️⃣ Tesztelési terv kidolgozása | Szcenáriók, metrikák, futtatási terv | 3 különböző teszteset dokumentálása | Overleaf PDF (2–3 oldal) | 🔶 60% |
+| 3️⃣ Tesztfuttatás és adatgyűjtés | Bag replay, CPU/latency mérés, screenshotok | Futtatási napló, ábrák, metrikák | teszt report és ábrák | 🔶 80% |
+| 4️⃣ Prezentáció | Összefoglaló 6–7 perces bemutató | Ábrák, mérési eredmények, konklúzió | ppt/beamer export Overleaf-ből | ⏳ 10% |
 
 ---
 
@@ -111,13 +111,20 @@ ros2 bag record /scan /filtered_scan /objects /object_markers /odom /tf /cmd_vel
 |----|--------|-----------------|---------|
 | T1 | Statikus akadály (fix tárgy) | Stabil pozíció, alacsony hiba (<5cm) | ✅ KÉSZ |
 | T2 | Mozgó objektum (robottal) | Objektum azonosítása és folytonos követés | ✅ KÉSZ (99.6% siker!) |
-| T3 | Több objektum térképezése | Konzisztens térkép, 90%+ detektálási arány | ⏳ Következik |
+| T3 | Több objektum egyidejűleg (stresszteszt) | Konzisztens detektálás, 90%+ arány | ✅ KÉSZ (98.9% siker!) |
 
-**T2 Eredmények:**
+**T2 Eredmények (mozgó robot):**
 - ✅ 237 objektum detektálva 238 scan-ből
 - ✅ 99.6% sikeres detektálás
-- ✅ Rosbag teljes (filtered_scan, objects, object_markers)
-- ✅ RViz vizualizáció optimalizálva
+- ✅ Scan rate: 0.86 Hz
+- ✅ Rosbag teljes (276.7s, 15.2 MiB)
+
+**T3 Eredmények (statikus robot, több objektum):**
+- ✅ 89 objektum detektálva 90 scan-ből
+- ✅ 98.9% sikeres detektálás
+- ✅ Scan rate: 1.11 Hz (+29% vs T2!) 🚀
+- ✅ Rosbag teljes (81.7s, 1.3 MiB)
+- ✅ Objektumok: ~3-5 egyidejűleg (manuális spawning)
 
 ### 2.2 Mérési metrikák
 
@@ -155,7 +162,9 @@ ros2 launch lidar_filter complete_system.launch.py
 **Futtatva:**
 - ✅ T1 teszt (statikus környezet)
 - ✅ T2 v1 teszt (hiányos)
-- ✅ T2 v2 teszt (sikeres, optimalizált)
+- ✅ T2 v2 teszt (sikeres, optimalizált, mozgó robot)
+- ✅ T3 v1 teszt (spawning sikertelen)
+- ✅ T3 v2 teszt (sikeres, manuális spawning, statikus robot)
 
 ### 3.2 Adatrögzítés ✅
 
@@ -167,7 +176,9 @@ ros2 bag record /scan /filtered_scan /objects /object_markers /odom /tf /cmd_vel
 **Rögzítve:**
 - ✅ T1: test_run1_static (~6 sec)
 - ✅ T2 v1: test_run_moving (214s, 9.3 MiB) - hiányos
-- ✅ T2 v2: test_run_moving_v2 (276s, 15.2 MiB) - teljes ✅
+- ✅ T2 v2: test_run_moving_v2 (276.7s, 15.2 MiB) - teljes ✅
+- ✅ T3 v1: test_run_stress (61.08s, 2.7 MiB) - spawning sikertelen
+- ✅ T3 v2: test_run_stress_v2 (81.7s, 1.3 MiB) - teljes ✅
 
 ### 3.3 Metrikák számítása 🔶
 
@@ -177,23 +188,36 @@ ros2 bag record /scan /filtered_scan /objects /object_markers /odom /tf /cmd_vel
   - Scan rate: 0.86 Hz
   - Detektálási siker: 99.6%
   - Üzenetek/sec: 182 msg/sec
+- ✅ T3 v1: Részletes elemzés (ANALYSIS_T3_v1.md)
+  - Spawning sikertelen probléma azonosítva
+  - Gazebo Harmonic kompatibilitási javítások
+- ✅ T3 v2: Részletes elemzés (ANALYSIS_T3_v2.md)
+  - Scan rate: 1.11 Hz (+29% vs T2!)
+  - Detektálási siker: 98.9%
+  - Manuális objektum spawning
 
 **Még kell:**
 - ⏳ Python script: rosbag → CSV konverzió
-- ⏳ Grafikonok készítése (matplotlib)
+- ⏳ Grafikonok készítése (matplotlib) - T1 vs T2 vs T3
 - ⏳ Precision/Recall számítás
+- ⏳ T3 rosbag részletes elemzés (objektumszám/scan)
 
 ### 3.4 Eredmények 🔶
 
 **Elkészült:**
-- ✅ Rosbag fájlok (T1, T2 v1, T2 v2)
-- ✅ Teszt jegyzetek (notes_t1.md, notes_t2.md, notes_t2_v2.md)
-- ✅ Részletes elemzés (ANALYSIS_T2_v2.md)
+- ✅ Rosbag fájlok (T1, T2 v1, T2 v2, T3 v1, T3 v2)
+- ✅ Teszt jegyzetek (notes_t1.md, notes_t2_v2.md, notes_t3.md)
+- ✅ Részletes elemzések:
+  - ANALYSIS_T2_v2.md (mozgó robot)
+  - ANALYSIS_T3_v1.md (spawning problémák)
+  - ANALYSIS_T3_v2.md (stresszteszt sikeres)
+  - GAZEBO_HARMONIC_FIX.md (kompatibilitás)
+- ✅ Összehasonlító metrikák (T2 vs T3)
 
 **Még kell:**
 - ⏳ **Screenshot-ok:** RViz, Gazebo, rqt_graph
 - ⏳ **Táblázatok:** Precision/Recall, latency, CPU-idő
-- ⏳ **Grafikonok:** Objektum pozíciók, detektálási arány
+- ⏳ **Grafikonok:** T1 vs T2 vs T3, scan rate, detektálási arány
 
 ---
 
@@ -266,7 +290,19 @@ project_mgm/
 │       │   ├── README_T2.md                 ✅ Teszt leírás (v1)
 │       │   ├── README_T2_OPTIMIZED.md       ✅ ÚJ! Optimalizált útmutató (v2)
 │       │   └── ANALYSIS_T2_v2.md            ✅ ÚJ! Részletes eredmény elemzés
-│       ├── T3_stress/                       ⏳ Előkészítve
+│       ├── T3_stress/                       ✅ T3 KÉSZ!
+│       │   ├── rosbag/
+│       │   │   ├── test_run_stress/         ✅ v1 (spawning sikertelen, 61s)
+│       │   │   └── test_run_stress_v2/      ✅ v2 (sikeres, 81.7s, 1.3 MiB)
+│       │   ├── continuous_spawn.sh          ✅ Gazebo Harmonic spawning script
+│       │   ├── spawn_objects.sh             ✅ Batch spawning (javítva)
+│       │   ├── notes_t3.md                  ✅ Teszt jegyzet (v1 + v2)
+│       │   ├── QUICKSTART_T3.md             ✅ Gyors indítási útmutató
+│       │   ├── README_T3.md                 ✅ Részletes teszt leírás
+│       │   ├── README_T3_v2.md              ✅ v2 javított útmutató
+│       │   ├── ANALYSIS_T3_v1.md            ✅ v1 elemzés (spawning hiba)
+│       │   ├── ANALYSIS_T3_v2.md            ✅ v2 elemzés (sikeres!)
+│       │   └── GAZEBO_HARMONIC_FIX.md       ✅ Kompatibilitási javítások
 │       └── TESZT_OSSZEFOGLALO.md            ✅ Összefoglaló
 ├── results/                                  ✅ Mappa létrehozva
 │   └── (rosbag fájlok ide kerülnek)
@@ -289,7 +325,7 @@ project_mgm/
 
 **Mindig ezeket a fájlokat frissítsd, amikor egy feladat elkészül!** ✅
 
-## 📝 Állapot (2025. október 29. - 23:15)
+## 📝 Állapot (2025. október 30. - 19:30)
 
 ### ✅ Kész feladatok:
 - ✅ **ROS 2 környezet beállítva** - Jazzy build sikeres (1 csomag: lidar_filter)
@@ -308,13 +344,22 @@ project_mgm/
 - ✅ **T2 teszt v1 futtatva** - Problémák azonosítva (hiányzó topic-ok, CPU 100%)
 - ✅ **T2 optimalizálás** - RViz config, helyes topic nevek, új launch
 - ✅ **T2 teszt v2 SIKERES!** - 237 objektum detektálva, teljes rosbag (15.2 MiB)
-- ✅ **T2 eredmények elemzése** - Részletes összehasonlítás v1 vs v2
-- ✅ **Dokumentáció frissítve** - README, TODO, Futtatási útmutató, Teszt jegyzetek, Elemzések
+- ✅ **T2 eredmények elemzése** - Részletes összehasonlítás v1 vs v2 (ANALYSIS_T2_v2.md)
+- ✅ **T3 teszt v1 futtatva** - Spawning sikertelen, problémák azonosítva
+- ✅ **Gazebo Harmonic javítások** - continuous_spawn.sh átírva gz parancsokra
+- ✅ **T3 teszt v2 SIKERES!** - 89 objektum detektálva (98.9%), scan rate 1.11 Hz (+29%!)
+- ✅ **T3 eredmények elemzése** - T2 vs T3 összehasonlítás (ANALYSIS_T3_v2.md)
+- ✅ **Dokumentáció frissítve (T3)** - README, TODO, notes, elemzések, javítások
+
+### 🎯 Fő Eredmények (T1, T2, T3):
+- **T1 (statikus):** Alap működés validálva
+- **T2 (mozgó):** 99.6% detektálás, 0.86 Hz scan rate, 276.7s
+- **T3 (stresszteszt):** 98.9% detektálás, 1.11 Hz scan rate (+29%), 81.7s
 
 ### ⏳ Következő lépések (prioritási sorrendben):
-1. **T2 Screenshot-ok készítése** - RViz, Gazebo, rqt_graph képernyőmentések ⏳ FOLYAMATBAN
-2. **T3 teszt előkészítése** - Stresszteszt több objektummal
-3. **Metrikák elemzése** - CSV adatok, grafikonok készítése (Python/matplotlib)
+1. **Screenshot-ok készítése** - RViz, Gazebo, rqt_graph (T2 és T3) ⏳
+2. **Metrikák elemzése** - CSV adatok, grafikonok (T1 vs T2 vs T3) ⏳
+3. **Overleaf dokumentum** - Tesztelési terv írása (2-3 oldal) ⏳
 4. **Tesztelési terv írása** - Overleaf dokumentum kezdése (Fázis 2)
 5. **Prezentáció készítése** - 6-7 perces bemutató (Fázis 4)
 
