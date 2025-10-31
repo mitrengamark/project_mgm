@@ -23,3 +23,5 @@ __pycache__/
 Thumbs.db
 
 /mgm
+.venv/
+tests/test_results/visualizations/
