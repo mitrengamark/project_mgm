@@ -29,133 +29,124 @@
 - ✅ **CSV export:** metrics_summary.csv
 - ✅ **Dokumentáció:** visualizations/README.md
 
-### 4. Dokumentáció (90% KÉSZ)
+### 4. Dokumentáció (95% KÉSZ)
 - ✅ **FUTTATAS_UTMUTATO.md:** v3.1, T3 eredményekkel
 - ✅ **TODO_MitrengaMark.md:** Teljes task tracking
 - ✅ **MUNKA_OSSZEFOGLALO:** 3 dokumentum (10-28, 10-30, 10-31)
 - ✅ **ANALYSIS dokumentumok:** T2 v2, T3 v1, T3 v2
 - ✅ **test_cases.md:** Teszt forgatókönyvek
+- ✅ **TESZTELESI_TERV_OVERLEAF.tex:** Teljes LaTeX dokumentum (3 oldal)
+- ✅ **README_TESZTELESI_TERV.md:** Használati útmutató Overleafhez
 - ⏳ **README.md:** Projekt főoldal (frissítendő)
 
----
-
-## ⏳ HÁTRALEVŐ FELADATOK (3 nap)
-
-### 1. Screenshot-ok (🔥 SÜRGŐS - 4-6 óra)
-**Prioritás:** MAGAS
-
-#### Szükséges képek:
-- [ ] **RViz2 T2 teszt**
-  - Mozgó robot + objektumok
-  - /filtered_scan visualization
-  - /object_markers (MarkerArray)
-  - TF frames (robot→base_scan)
-
-- [ ] **RViz2 T3 teszt**
-  - Sok objektum egyszerre (10+)
-  - Objektum eloszlás a térben
-  - Tiszta, átlátható nézet
-
-- [ ] **Gazebo szimulációs környezet**
-  - TurtleBot3 Burger
-  - Spawn-olt objektumok (válogatva)
-  - Világos kamera szög
-
-- [ ] **rqt_graph - Node Topology**
-  - /lidar_filter node
-  - Topic kapcsolatok (/scan → /filtered_scan, /objects)
-  - Subscriber/Publisher vizualizáció
-
-- [ ] **Terminal output**
-  - `ros2 topic hz /objects` kimenet
-  - `ros2 bag info` részlet
-  - Launch output (tiszta, működés)
-
-**Eszközök:**
-- RViz2 screenshot: File → Save Config
-- Gazebo: `scrot` vagy `gnome-screenshot`
-- Terminal: Screenshot tool (Ctrl+Shift+Print)
-
-**Mentés:** `tests/screenshots/` könyvtárba
+### 5. Screenshot-ok (100% KÉSZ) 📸
+- ✅ **RViz baseline:** rviz_baseline.png
+- ✅ **Gazebo környezet:** gazebo_environment.png
+- ✅ **Gazebo stressz teszt:** gazebo_stress_test.png (10+ objektum)
+- ✅ **RViz stressz teszt:** rviz_stress_test.png (multi-objektum)
+- ✅ **Terminal topic hz:** terminal_topic_hz.png
+- ✅ **Terminal bag info:** terminal_bag_info.png
+- ✅ **rqt_graph:** rqt_graph.png (node topológia)
+- ✅ **README_SCREENSHOTS.md:** Létrehozási útmutató
 
 ---
 
-### 2. Overleaf Tesztelési Terv (🔥 SÜRGŐS - 6-8 óra)
+## ⏳ HÁTRALEVŐ FELADATOK (2 nap)
+
+### 1. Prezentáció Készítése (🔥 SÜRGŐS - 4-6 óra)
 **Prioritás:** KRITIKUS
 
-#### Javasolt Struktúra (2-3 oldal):
+#### Javasolt Struktúra (6-7 perc, 8-10 slide):
 
-**1. Bevezetés (0.5 oldal)**
-- Projekt célja: LIDAR-alapú objektum detektálás TurtleBot3 roboton
-- ROS 2 Jazzy, Gazebo Harmonic környezet
-- Tesztelési módszertan áttekintése
+**Slide 1: Címlap**
+- Projekt címe: LIDAR Alapú Objektum Detektálás
+- Készítette: Mitrenga Márk
+- Dátum: 2025. november
 
-**2. Rendszerarchitektúra (0.5 oldal)**
-- Node diagram (rqt_graph screenshot)
-- Topic struktúra: /scan → /filtered_scan, /objects, /object_markers
-- TF frames: odom → base_footprint → base_scan
+**Slide 2: Projekt Áttekintése**
+- Célok: Valós idejű objektum detektálás, követés, vizualizáció
+- ROS 2 Jazzy + Gazebo Harmonic + TurtleBot3
+- Python implementáció
 
-**3. Tesztelési Forgatókönyvek (0.5-1 oldal)**
+**Slide 3: Rendszer Architektúra**
+- Node diagram (rqt_graph.png)
+- Topic flow: /scan → /filtered_scan, /objects
+- TF frames: odom → base_link → base_scan
 
-| Teszt | Környezet | Cél | Időtartam |
-|-------|-----------|-----|-----------|
-| T1 | Statikus, 1 objektum | Alapfunkció validálás | 60 sec |
-| T2 | Mozgó robot, 3-4 objektum | Dinamikus környezet | 246 sec |
-| T3 | Statikus robot, 10+ objektum | Stressz, kapacitás | 81.7 sec |
+**Slide 4: Tesztelési Módszertan**
+- T1: Statikus környezet (baseline)
+- T2: Mozgó robot (dinamikus)
+- T3: Stressz teszt (10+ objektum)
+- Rosbag elemzés + CSV export
 
-**4. Eredmények (1 oldal)**
-- **Grafikon:** combined_metrics.pdf (2x2 subplot)
-- **Grafikon:** t3_object_distribution.pdf (részletes T3)
-- **Táblázat:** metrics_summary_table.pdf
+**Slide 5: Teszt Eredmények - Táblázat**
+- Összehasonlító táblázat (T1/T2/T3)
+- Kulcs metrikák: Scan rate, Siker%, Átlag obj/scan
+- Kiemelt eredmény: T3 = 1.11 Hz, 100% siker, 10.26 obj/scan
 
-**Főbb eredmények szövegesen:**
-- Scan rate: T3 = 1.11 Hz (+29% vs T2)
-- Megbízhatóság: T3 = 100%
-- Objektum kezelés: 10.26 átlag obj/scan T3-ban
+**Slide 6: Vizualizációk**
+- combined_metrics.pdf (főgrafikon)
+- t3_object_distribution.pdf (eloszlás)
+- Screenshot: RViz + Gazebo
 
-**5. Értékelés és Következtetések (0.5 oldal)**
-- ✅ Rendszer production-ready
-- ✅ Robusztus többszörös objektum kezelés
-- ✅ Scan rate javulás statikus környezetben
-- 🎯 Ajánlás: További optimalizálás mozgó robot esetén
+**Slide 7: Értékelés és Tanulságok**
+- Pozitívumok: 100% megbízhatóság, 10+ objektum kezelés, +29% scan rate
+- Kihívások: CPU terhelés (WSL), alacsony scan rate (szimuláció)
+- Tanulságok: Topic konzisztencia, RViz optimalizálás
 
-**LaTeX Sablon:**
-```latex
-\documentclass[12pt,a4paper]{article}
-\usepackage[utf8]{inputenc}
-\usepackage{graphicx}
-\usepackage{booktabs}
+**Slide 8: Következtetések**
+- Rendszer production-ready
+- Sikeres validálás 3 teszteseten
+- Következő lépések: Natív Linux, valós robot tesztelés
 
-\title{LIDAR Object Detection\\Tesztelési Terv és Eredmények}
-\author{Mitre Mark}
-\date{2025-11-03}
-
-\begin{document}
-\maketitle
-
-\section{Bevezetés}
-...
-
-\section{Eredmények}
-\begin{figure}[h]
-  \centering
-  \includegraphics[width=0.9\textwidth]{visualizations/combined_metrics.pdf}
-  \caption{T1, T2, T3 tesztek összehasonlítása}
-\end{figure}
-
-\end{document}
-```
-
-**Fájlok feltöltése Overleaf-re:**
-- visualizations/*.pdf (grafikonok)
-- screenshots/*.png (képek)
+**Eszközök:**
+- Beamer LaTeX (ajánlott - konzisztens Overleaf dokumentummal)
+- PowerPoint/Google Slides (alternatíva)
+- 6-7 perc beszéd (próbálj időzíteni!)
 
 ---
 
-### 3. Prezentáció (🔥 KÖZEPESEN SÜRGŐS - 4-6 óra)
+### 2. Overleaf Tesztelési Terv Feltöltése (1 óra)
 **Prioritás:** MAGAS
 
-#### Javasolt Slájdok (6-7 perc = 8-10 slide):
+#### Teendők:
+
+**Fájlok feltöltése Overleafre:**
+- [x] TESZTELESI_TERV_OVERLEAF.tex (KÉSZ!)
+- [ ] tests/screenshots/rqt_graph.png
+- [ ] tests/test_results/visualizations/combined_metrics.pdf
+- [ ] tests/test_results/visualizations/t3_object_distribution.pdf
+- [ ] tests/test_results/visualizations/performance_radar.pdf
+
+**Overleaf projekt struktúra:**
+```
+projekt_root/
+├── TESZTELESI_TERV_OVERLEAF.tex  (főfájl)
+├── tests/
+│   ├── screenshots/
+│   │   └── rqt_graph.png
+│   └── test_results/
+│       └── visualizations/
+│           ├── combined_metrics.pdf
+│           ├── t3_object_distribution.pdf
+│           └── performance_radar.pdf
+```
+
+**Fordítás:**
+- Compiler: pdfLaTeX
+- Main document: TESZTELESI_TERV_OVERLEAF.tex
+- Várt kimenet: 2.5-3.5 oldal PDF
+
+**Ellenőrzés:**
+- [ ] Minden ábra látszik
+- [ ] Magyar ékezetek helyesen
+- [ ] Táblázatok szépen formázottak
+- [ ] PDF generálás sikeres
+
+---
+
+### 3. README.md Projekt Főoldal Frissítése (1-2 óra)
+**Prioritás:** KÖZEPES
 
 1. **Címlap**
    - Cím: LIDAR-alapú Objektum Detektálás
@@ -216,46 +207,45 @@
 | ✅ Tesztelés | 100% | - | - |
 | ✅ Rosbag elemzés | 100% | - | - |
 | ✅ Vizualizáció | 100% | - | - |
-| ⏳ Screenshot-ok | 0% | 4-6 óra | 🔥 MAGAS |
-| ⏳ Overleaf dokumentum | 0% | 6-8 óra | 🔥🔥 KRITIKUS |
-| ⏳ Prezentáció | 0% | 4-6 óra | 🔥 MAGAS |
+| ✅ Screenshot-ok | 100% | - | - |
+| ✅ Overleaf dokumentum | 100% | - | - |
+| ⏳ Prezentáció | 0% | 4-6 óra | 🔥🔥 KRITIKUS |
+| ⏳ README.md frissítés | 0% | 1-2 óra | 🔥 MAGAS |
 
-**Összesített hátralevő idő:** 14-20 óra  
-**Rendelkezésre álló idő:** 72 óra (3 nap)  
-**Biztonsági puffer:** 52-58 óra ✅
+**Összesített hátralevő idő:** 5-8 óra  
+**Rendelkezésre álló idő:** 48 óra (2 nap)  
+**Biztonsági puffer:** 40-43 óra ✅✅
+
+**Projekt készültség:** ~85% 🎉
 
 ---
 
 ## 🎯 Ajánlott Munkamenet
 
-### 2025-10-31 (Ma)
-- ⏰ **14:00-18:00:** Screenshot-ok elkészítése
-  - RViz futtatás, képek mentése
-  - Gazebo environment képek
-  - Terminal output capture
-- ⏰ **19:00-22:00:** Overleaf dokumentum kezdés
-  - Struktúra létrehozása
-  - Bevezetés és módszertan írása
+### 2025-11-01 (Ma - ✅ SCREENSHOT-OK és OVERLEAF KÉSZ!)
+- ✅ **BEFEJEZVE:** Screenshot-ok elkészítése (7 db)
+- ✅ **BEFEJEZVE:** Overleaf dokumentum teljes (TESZTELESI_TERV_OVERLEAF.tex)
+- **Következő:** Overleaf fájlok feltöltése (1 óra)
 
-### 2025-11-01 (Holnap)
-- ⏰ **09:00-13:00:** Overleaf dokumentum befejezés
-  - Eredmények szekció
-  - Grafikonok beillesztése
-  - Következtetések
-- ⏰ **14:00-18:00:** Prezentáció készítése
-  - Slide-ok létrehozása
-  - Grafikonok beillesztése
-  - Előadás gyakorlása
+### 2025-11-01-02 (Ma este / Holnap reggel)
+- ⏰ **Opcionális:** Prezentáció kezdése
+  - Slide struktúra vázlat
+  - Beamer LaTeX vagy PowerPoint választás
+  - Első 3-4 slide elkészítése
 
-### 2025-11-02 (Szombat)
-- ⏰ **09:00-12:00:** Finalizálás
-  - Overleaf utolsó simítások
-  - Prezentáció finomhangolás
-  - README.md frissítés
-- ⏰ **13:00-15:00:** Teljes átnézés
-  - Dokumentáció ellenőrzés
-  - Prezentáció próbaelőadás
-  - Backup készítés
+### 2025-11-02 (Holnap - Szombat)
+- ⏰ **09:00-13:00:** Prezentáció fő munka
+  - Mind a 8-10 slide elkészítése
+  - Grafikonok és screenshot-ok beillesztése
+  - Szöveges tartalom írása
+- ⏰ **14:00-16:00:** Prezentáció finalizálás
+  - Előadás gyakorlása (időzítés: 6-7 perc)
+  - Slide-ok finomhangolása
+  - PDF export
+- ⏰ **16:00-18:00:** README.md és végső átnézés
+  - Projekt főoldal frissítése
+  - Dokumentáció teljes ellenőrzése
+  - Backup készítése (ZIP, GitHub push)
 
 ### 2025-11-03 (Vasárnap) - DEADLINE
 - ⏰ **09:00-12:00:** Utolsó ellenőrzés

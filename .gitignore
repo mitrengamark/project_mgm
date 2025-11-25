@@ -25,3 +25,6 @@ Thumbs.db
 /mgm
 .venv/
 tests/test_results/visualizations/
+tests/screenshots/
+TESZTELESI_TERV_OVERLEAF.tex
+README_TESZTELESI_TERV.md
