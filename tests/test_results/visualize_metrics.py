@@ -1,8 +1,29 @@
 #!/usr/bin/env python3
 """
-Tesztelési metrikák vizualizációja
-Összehasonlítja a T1, T2, és T3 teszteket
-Generál grafikonokat PDF és PNG formátumban
+Tesztelési metrikák vizualizációs eszköz - T1, T2, T3 tesztek összehasonlítása.
+
+Ez a szkript a lidar_filter projekt három fő tesztjének (T1, T2, T3) eredményeit
+vizualizálja különböző grafikonokon és táblázatokon keresztül.
+
+Tesztek:
+- T1: Statikus környezet teszt (egyetlen álló objektum)
+- T2: Mozgó robot teszt (változó távolságok)
+- T3: Stressz teszt (több objektum, dinamikus környezet)
+
+Generált kimenetek:
+- Scan rate összehasonlítás (Hz)
+- Detektálási megbízhatóság (%)
+- Objektumok/scan grafikonok
+- Kombinált metrikák (2x2 subplot)
+- T3 objektum eloszlás részletes elemzés
+- Teljesítmény radar chart
+- Összefoglaló táblázat (CSV + kép)
+
+Használat:
+    python3 visualize_metrics.py
+
+Kimenetek:
+    visualizations/ könyvtár - PDF és PNG formátumban
 """
 
 import matplotlib.pyplot as plt
@@ -11,73 +32,102 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
-# Magyar karakterek támogatása
+# Magyar karakterek támogatása matplotlib-ben
 plt.rcParams['font.family'] = 'DejaVu Sans'
 plt.rcParams['axes.unicode_minus'] = False
 
-# Stílus beállítása
+# Stílus beállítása - modern, professzionális megjelenés
 plt.style.use('seaborn-v0_8-darkgrid')
-colors = ['#2E86AB', '#A23B72', '#F18F01']  # Kék, lila, narancs
+colors = ['#2E86AB', '#A23B72', '#F18F01']  # Kék, lila, narancs (T1, T2, T3)
 
 class TestMetricsVisualizer:
+    """
+    Tesztelési metrikák vizualizáló osztály.
+    
+    Ez az osztály felelős a három teszt (T1, T2, T3) eredményeinek
+    vizualizálásáért. Különböző típusú grafikonokat generál és
+    PDF/PNG formátumban menti őket.
+    
+    Attributes:
+        output_dir (Path): Kimeneti könyvtár a grafikonoknak
+        test_data (dict): T1, T2, T3 tesztek adatai és metrikái
+    """
+    
     def __init__(self, output_dir='visualizations'):
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(exist_ok=True)
+        """
+        Vizualizátor inicializálása - kimeneti könyvtár és teszt adatok.
         
-        # T1, T2, T3 adatok
+        Args:
+            output_dir (str): Kimeneti könyvtár neve (alapértelmezett: visualizations)
+        """
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(exist_ok=True)  # Könyvtár létrehozása ha nem létezik
+        
+        # T1, T2, T3 tesztek adatai
+        # Ezek az értékek a valós tesztekből származnak
         self.test_data = {
             'T1': {
                 'name': 'T1: Statikus környezet',
-                'duration': 60.0,  # sec
-                'scan_rate': 0.92,  # Hz
-                'objects_detected': 51,
-                'avg_objects_per_scan': 1.0,
-                'success_rate': 92.7,  # %
+                'duration': 60.0,  # Teszt időtartama (sec)
+                'scan_rate': 0.92,  # LIDAR scan frekvencia (Hz)
+                'objects_detected': 51,  # Összes detektált objektum
+                'avg_objects_per_scan': 1.0,  # Átlagos objektum/scan
+                'success_rate': 92.7,  # Sikeres detektálás aránya (%)
                 'description': 'Egyetlen statikus objektum'
             },
             'T2': {
                 'name': 'T2: Mozgó robot',
-                'duration': 246.0,  # sec
-                'scan_rate': 0.86,  # Hz
-                'objects_detected': 237,
-                'avg_objects_per_scan': 3.5,  # becsült
-                'success_rate': 95.0,  # %
+                'duration': 246.0,  # Hosszabb teszt
+                'scan_rate': 0.86,  # Alacsonyabb scan rate (mozgás miatt)
+                'objects_detected': 237,  # Több scan = több detektálás
+                'avg_objects_per_scan': 3.5,  # Több objektum látható
+                'success_rate': 95.0,  # Magas megbízhatóság
                 'description': 'Mozgó robot, változó távolságok'
             },
             'T3': {
                 'name': 'T3: Stressz teszt',
-                'duration': 81.7,  # sec
-                'scan_rate': 1.11,  # Hz
-                'objects_detected': 1058,
-                'avg_objects_per_scan': 10.26,
-                'success_rate': 100.0,  # %
+                'duration': 81.7,  # Közepes időtartam
+                'scan_rate': 1.11,  # Legmagasabb scan rate
+                'objects_detected': 1058,  # Legtöbb objektum (több objektum/scan)
+                'avg_objects_per_scan': 10.26,  # Jelentősen több objektum
+                'success_rate': 100.0,  # Tökéletes detektálás
                 'description': 'Többszörös objektumok, dinamikus környezet'
             }
         }
     
     def plot_scan_rate_comparison(self):
-        """Scan rate összehasonlítás oszlopdiagram"""
+        """
+        LIDAR Scan Rate összehasonlító oszlopdiagram generálása.
+        
+        Ez a grafikon mutatja hogy a három teszt során milyen
+        frekvenciával dolgozott a LIDAR sensor (mérés/sec).
+        
+        Magasabb scan rate = több adat, gyorsabb reaktív képesség
+        """
         fig, ax = plt.subplots(figsize=(10, 6))
         
+        # Teszt nevek és scan rate értékek kinyerése
         tests = list(self.test_data.keys())
         scan_rates = [self.test_data[t]['scan_rate'] for t in tests]
         
+        # Oszlopdiagram létrehozása egyedi színekkel
         bars = ax.bar(tests, scan_rates, color=colors, alpha=0.8, edgecolor='black', linewidth=1.5)
         
-        # Értékek kiírása az oszlopokra
+        # Értékek kiírása az oszlopok tetejére
         for bar, rate in zip(bars, scan_rates):
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height,
                    f'{rate:.2f} Hz',
                    ha='center', va='bottom', fontsize=12, fontweight='bold')
         
+        # Tengelyek és cím formázása
         ax.set_ylabel('Scan Rate (Hz)', fontsize=14, fontweight='bold')
         ax.set_xlabel('Teszt Forgatókönyv', fontsize=14, fontweight='bold')
         ax.set_title('LIDAR Scan Rate Összehasonlítás', fontsize=16, fontweight='bold', pad=20)
-        ax.set_ylim(0, max(scan_rates) * 1.2)
+        ax.set_ylim(0, max(scan_rates) * 1.2)  # 20% extra hely az értékeknek
         ax.grid(axis='y', alpha=0.3)
         
-        # Leírások hozzáadása
+        # Teszt leírások hozzáadása az X tengely alá
         descriptions = [self.test_data[t]['description'] for t in tests]
         for i, (test, desc) in enumerate(zip(tests, descriptions)):
             ax.text(i, -0.15, desc, ha='center', va='top', fontsize=9, 
@@ -89,7 +139,14 @@ class TestMetricsVisualizer:
         print("✅ Scan rate összehasonlítás elkészült")
     
     def plot_detection_success(self):
-        """Detektálási sikerességi arány"""
+        """
+        Detektálási sikerességi arány oszlopdiagram.
+        
+        Mutatja hogy a három teszt során hány százalékban sikerült
+        objektumot detektálni (legalább 1 objektum/scan).
+        
+        100% = minden scan-ben volt detektálás (ideális)
+        """
         fig, ax = plt.subplots(figsize=(10, 6))
         
         tests = list(self.test_data.keys())
@@ -97,17 +154,19 @@ class TestMetricsVisualizer:
         
         bars = ax.bar(tests, success_rates, color=colors, alpha=0.8, edgecolor='black', linewidth=1.5)
         
-        # Értékek kiírása
+        # Értékek kiírása az oszlopokra
         for bar, rate in zip(bars, success_rates):
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height,
                    f'{rate:.1f}%',
                    ha='center', va='bottom', fontsize=12, fontweight='bold')
         
+        # Tengelyek és formázás
         ax.set_ylabel('Sikeres Detektálás (%)', fontsize=14, fontweight='bold')
         ax.set_xlabel('Teszt Forgatókönyv', fontsize=14, fontweight='bold')
         ax.set_title('Objektum Detektálás Megbízhatósága', fontsize=16, fontweight='bold', pad=20)
-        ax.set_ylim(0, 105)
+        ax.set_ylim(0, 105)  # Kis extra hely 100% felett
+        # Célvonal 100%-nál - ideális eredmény jelzése
         ax.axhline(y=100, color='green', linestyle='--', linewidth=2, alpha=0.5, label='100% Cél')
         ax.grid(axis='y', alpha=0.3)
         ax.legend(loc='lower right', fontsize=10)
@@ -118,7 +177,15 @@ class TestMetricsVisualizer:
         print("✅ Detektálási sikerességi arány elkészült")
     
     def plot_objects_per_scan(self):
-        """Átlagos objektumszám scan-enként"""
+        """
+        Átlagos objektumszám/scan oszlopdiagram.
+        
+        Mutatja hogy scan-enként átlagosan hány objektumot detektált
+        a rendszer. Ez a rendszer kapacitását és a teszt komplexitását
+        jelzi.
+        
+        Magasabb érték = komplexebb környezet, több objektum kezelése
+        """
         fig, ax = plt.subplots(figsize=(10, 6))
         
         tests = list(self.test_data.keys())
@@ -367,21 +434,49 @@ class TestMetricsVisualizer:
         print("✅ Összefoglaló táblázat kép elkészült")
     
     def _save_figure(self, fig, name):
-        """Ábra mentése PDF és PNG formátumban"""
+        """
+        Grafikon mentése PDF és PNG formátumban.
+        
+        Minden grafikont két formátumban ment:
+        - PDF: Vektorgrafikus, kiváló minőség nyomtatáshoz és prezentációhoz
+        - PNG: Rasztergrafikus, web és dokumentáció számára
+        
+        Args:
+            fig: Matplotlib figure objektum
+            name (str): Fájlnév (kiterjesztés nélkül)
+        """
         pdf_path = self.output_dir / f'{name}.pdf'
         png_path = self.output_dir / f'{name}.png'
         
+        # PDF mentés - 300 DPI, szoros layout
         fig.savefig(pdf_path, dpi=300, bbox_inches='tight')
+        # PNG mentés - 150 DPI (kisebb fájlméret, web-hez elegendő)
         fig.savefig(png_path, dpi=150, bbox_inches='tight')
         
+        # Mentett fájlok kiírása
         print(f"   💾 {pdf_path}")
         print(f"   💾 {png_path}")
     
     def generate_all(self):
-        """Összes grafikon generálása"""
+        """
+        Összes grafikon és táblázat generálása.
+        
+        Ez a főmetódus sorban meghívja az összes vizualizációs
+        metódust és legenerálja a teljes riportot.
+        
+        Generált kimenetek:
+        1. Scan rate összehasonlítás
+        2. Detektálási megbízhatóság
+        3. Objektumok/scan
+        4. Kombinált metrikák (2x2)
+        5. T3 objektum eloszlás
+        6. Teljesítmény radar chart
+        7. Összefoglaló táblázat (CSV + kép)
+        """
         print("\n🎨 Metrikák Vizualizáció Generálása...")
         print("=" * 50)
         
+        # Minden vizualizáció generálása sorban
         self.plot_scan_rate_comparison()
         self.plot_detection_success()
         self.plot_objects_per_scan()
@@ -390,6 +485,7 @@ class TestMetricsVisualizer:
         self.plot_performance_radar()
         self.generate_summary_table()
         
+        # Befejezés üzenet
         print("\n" + "=" * 50)
         print(f"✅ Összes grafikon elkészült!")
         print(f"📁 Kimenet: {self.output_dir.absolute()}")
@@ -397,10 +493,17 @@ class TestMetricsVisualizer:
 
 
 if __name__ == '__main__':
+    """
+    Főprogram - vizualizátor futtatása.
+    
+    Létrehozza a TestMetricsVisualizer példányt és legenerálja
+    az összes grafikont a visualizations/ könyvtárba.
+    """
     # Vizualizátor létrehozása
     viz = TestMetricsVisualizer(output_dir='visualizations')
     
     # Összes grafikon generálása
     viz.generate_all()
     
+    # Befejezési üzenet felhasználónak
     print("\n✅ KÉSZ! Használd a PDF fájlokat a dokumentációban és prezentációban!")

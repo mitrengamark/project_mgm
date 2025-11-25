@@ -9,10 +9,11 @@
 
 ## 📖 Dokumentáció
 
-- **[TODO - Feladatlista](docs/TODO_MitrengaMark.md)** - Részletes feladatok, státusz, és mérföldkövek (95% kész Fázis 1)
-- **[Futtatási útmutató](docs/FUTTATAS_UTMUTATO.md)** - Lépésről-lépésre rendszerindítási útmutató (v2.0)
-- **[Munkamenet összefoglaló](docs/MUNKA_OSSZEFOGLALO_2025-10-28.md)** - 2025.10.28 munkamenet részletei
+- **[Projekt Státusz](PROJEKT_STATUS.md)** - Aktuális projekt állapot és befejezett feladatok
+- **[Futtatási útmutató](docs/FUTTATAS_UTMUTATO.md)** - Részletes rendszerindítási útmutató
+- **[Tesztelési terv](docs/README_TESZTELESI_TERV.md)** - Tesztelési módszertan és útmutató
 - **[LIDAR Filter README](src/mgm_gyak/lidar_filter/README.md)** - Csomag-specifikus dokumentáció
+- **[Teszt eredmények](tests/test_results/TESZT_OSSZEFOGLALO.md)** - T1, T2, T3 tesztek összefoglalója
 
 ---
 
