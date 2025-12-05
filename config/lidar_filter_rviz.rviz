@@ -123,6 +123,18 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /object_markers
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray (Object Labels)
+      Namespaces:
+        object_labels: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /object_labels
+      Value: true
     - Alpha: 1
       Arrow Length: 0.30000001192092896
       Class: rviz_default_plugins/PoseArray

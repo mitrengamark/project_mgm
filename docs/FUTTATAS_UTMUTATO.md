@@ -76,14 +76,28 @@ ros2 run lidar_filter lidar_filter_node
 
 **Várt eredmény:**
 ```
-[INFO] [lidar_filter_node]: LIDAR Filter Node initialized
+[INFO] [lidar_filter_node]: LIDAR Filter Node (DBSCAN + Tracker) initialized
+[INFO] [lidar_filter_node]: Publishing topics: /filtered_scan, /objects, /object_markers, /object_labels
+[INFO] [lidar_filter_node]: Object tracking: 5 sec timeout, 0.6m max distance
 ```
 
 **Publikált topicok:**
 - `/filtered_scan` - Szűrt LIDAR adatok (LaserScan)
-- `/objects` - Detektált objektumok (PoseArray) - 237 objektum a T2 tesztben ✅
-- `/object_markers` - Vizualizációs markerek (MarkerArray)
+- `/objects` - Detektált objektumok (PoseArray) - **DBSCAN klaszterezés**
+- `/object_markers` - Vizualizációs markerek (MarkerArray) - Piros hengerek
+- `/object_labels` - Objektum ID-k (MarkerArray) - TEXT markerek `OBJ_0`, `OBJ_1`, stb. ✅
 - `/map` - Térképadatok (OccupancyGrid)
+
+**Nyomkövetési paraméterek:**
+- `max_distance`: 0.6m - max távolság az objektumok között a párosításhoz
+- `timeout`: 5 sec - meddig tartjuk meg az ID-ját egy eltakarodott objektumnak
+- `cluster_threshold` (DBSCAN eps): 0.2m - pontok közötti max távolság egy klaszterben
+- `min_cluster_size` (DBSCAN min_samples): 3 - min pontok száma egy objektumhoz
+
+**🎯 ID megőrzés teleop mozgásakor:**
+- Robot mozog → Objektumok elmozdulnak, de **ID-k megmaradnak** ✅
+- Fa/fal közébe takaród egy obj → ID eltűnik RViz-ből (timeout számlálódik)
+- Objektum < 5 sec alatt újra látható → **UGYANAZ az ID!** ✅ (ezt szükséges tesztelni)
 
 **⚠️ FONTOS:** A node már a `lib/lidar_filter/` mappában van (setup.cfg javítás után)!
 
@@ -135,6 +149,38 @@ ros2 run turtlebot3_teleop teleop_keyboard
 - `x` - hátra
 - `s` - megállás
 - `q` / `z` - sebesség állítás
+
+---
+
+## 🔍 Nyomkövetés Debuggolása (opcionális - 4. vagy 5. terminál)
+
+Az objektum ID-k megtartásának tesztelésére:
+
+```bash
+cd ~/codes/mgm/project_mgm
+source install/setup.bash
+python3 test_tracking.py
+```
+
+**Kimenet példa:**
+```
+[Frame 10] Detektált objektumok: 3
+  [0] Pozíció: (1.24m, 0.56m) | Távolság: 1.37m | Szög: 24.2°
+  [1] Pozíció: (-0.82m, 1.93m) | Távolság: 2.10m | Szög: 113.0°
+  [2] Pozíció: (0.15m, 2.41m) | Távolság: 2.41m | Szög: 86.4°
+
+  📍 ID-k az RViz-ben:
+    OBJ_0 @ (1.24m, 0.56m)
+    OBJ_1 @ (-0.82m, 1.93m)
+    OBJ_2 @ (0.15m, 2.41m)
+```
+
+**Tesztelési forgatókönyv:**
+1. Futtas a `test_tracking.py`-t
+2. Mozgatsd a robotot teleop-pal
+3. Figyeld az ID-kat - **nem szabad megváltozniuk!**
+4. Tedd el egy objektumot a robot útjában
+5. Majd mozgatd el → **az ID megmarad!** ✅
 
 ---
 

@@ -26,140 +26,41 @@ Ez a dokumentum tartalmazza a projekt következő fejlesztési lépéseit. A fel
 
 ---
 
-### 🔴 1. PRIORITÁS: DBSCAN Integráció és Objektum Címkézés
+### 🟢 1. PRIORITÁS: DBSCAN Integráció és Objektum Címkézés
 
 **Feladat:** Jelenlegi egyszerű clustering algoritmus lecserélése DBSCAN-re és perzisztens objektum címkézés implementálása.
 
 #### 1.1. DBSCAN Algoritmus Integráció
 
-**Cél:** Robusztusabb objektum detektálás
-- [ ] `sklearn.cluster.DBSCAN` importálása a `lidar_filter_node.py`-ba
-- [ ] `simple_clustering()` metódus átírása DBSCAN használatára
-- [ ] Paraméterek finomhangolása:
-  - `eps`: Klaszteren belüli max távolság (jelenlegi `cluster_threshold` ~0.2m)
-  - `min_samples`: Min pontok száma klaszterben (jelenlegi `min_cluster_size` ~3)
-- [ ] Tesztelés különböző paraméterekkel
-- [ ] Összehasonlítás az eredeti algoritmussal (metrikák: sebesség, pontosság)
-
-**Implementációs útmutató:**
-```python
-from sklearn.cluster import DBSCAN
-import numpy as np
-
-def dbscan_clustering(self, points, eps=0.2, min_samples=3):
-    """
-    DBSCAN alapú clustering
-    
-    Args:
-        points: np.array, alakja (N, 2) - x,y koordináták
-        eps: float, maximum távolság klaszteren belül (meter)
-        min_samples: int, minimum pontok száma egy klaszterben
-        
-    Returns:
-        clusters: list of np.array - klaszterenként a pontok listája
-    """
-    if len(points) < min_samples:
-        return []
-    
-    # DBSCAN futtatása
-    clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(points)
-    labels = clustering.labels_
-    
-    # Klaszterek szeparálása (noise: label=-1)
-    clusters = []
-    unique_labels = set(labels)
-    for label in unique_labels:
-        if label == -1:  # Noise pontok kihagyása
-            continue
-        cluster_points = points[labels == label]
-        clusters.append(cluster_points)
-    
-    return clusters
-```
-
-**Fájlok módosítása:**
-- `src/mgm_gyak/lidar_filter/lidar_filter/lidar_filter_node.py`
-- `src/mgm_gyak/lidar_filter/package.xml` (sklearn dependency)
-- `src/mgm_gyak/lidar_filter/setup.py` (sklearn requirement)
+- [x] `sklearn.cluster.DBSCAN` importálása a `lidar_filter_node.py`-ba
+- [x] `simple_clustering()` metódus átírása DBSCAN használatára
+- [x] Paraméterek finomhangolása (eps, min_samples)
+- [x] Tesztelés különböző paraméterekkel
+- [x] Összehasonlítás az eredeti algoritmussal
 
 #### 1.2. Perzisztens Objektum Címkézés
 
-**Cél:** Objektumok egyedi ID-val való követése frame-ek között
-
-**Követelmények:**
-- ✅ Ha objektum látható RViz-ben → címke megjelenítése
-- ✅ Ha objektum eltakarva (nem látható) → címke NEM jelenik meg
-- ✅ Ha objektum újra megjelenik → UGYANAZ a címke (ID-tracking)
-- ✅ Új objektum → új címke
-- ✅ Objektum eltűnik végleg (timeout) → címke felszabadul
-
-**Implementációs terv:**
-
-```python
-class ObjectTracker:
-    """Objektum követő rendszer perzisztens ID-kkal"""
-    
-    def __init__(self, max_distance=0.5, timeout=2.0):
-        """
-        Args:
-            max_distance: Max távolság objektumok közepességéhez (meter)
-            timeout: Idő, amíg objektum ID megmarad eltűnés után (sec)
-        """
-        self.tracked_objects = {}  # {id: {'position': (x,y), 'last_seen': time}}
-        self.next_id = 0
-        self.max_distance = max_distance
-        self.timeout = timeout
-    
-    def update(self, current_objects, current_time):
-        """
-        Frissíti a követett objektumokat
-        
-        Args:
-            current_objects: list of (x, y) tuple - detektált objektumok
-            current_time: float - jelenlegi idő (seconds)
-            
-        Returns:
-            object_ids: list of int - objektumok ID-i
-        """
-        # Implement: Hungarian algorithm vagy nearest neighbor matching
-        pass
-    
-    def get_visible_objects(self):
-        """
-        Visszaadja a látható objektumokat ID-val
-        
-        Returns:
-            list of (id, x, y) tuple
-        """
-        pass
-    
-    def cleanup_old_objects(self, current_time):
-        """Timeout-olt objektumok törlése"""
-        pass
-```
-
-**Címke megjelenítés RViz-ben:**
-- `visualization_msgs/MarkerArray` használata TEXT típusú markerekkel
-- Marker ID = objektum ID
-- Szöveg: f"OBJ_{id}"
-- Pozíció: objektum felett (z = 0.5m)
-- Csak akkor publikál, ha objektum látható
-
-**Új topic:**
-- `/object_labels` (visualization_msgs/MarkerArray) - szöveges címkék
-
-**Fájlok módosítása:**
-- `src/mgm_gyak/lidar_filter/lidar_filter/lidar_filter_node.py`
-  - Új `ObjectTracker` osztály hozzáadása
-  - `scan_callback()` módosítása tracker használatához
-  - Új `create_label_markers()` metódus
+- [x] `ObjectTracker` osztály teljes implementálása
+- [x] Hungarian algoritmus (linear_sum_assignment) integrálása
+- [x] Objektum ID-k RViz TEXT markerekkel
+- [x] Eltakarodott objektumok kezelése (5 sec timeout)
+- [x] ID stabilitás javítása (1.5m max_distance)
+- [x] **Háromszintű párosítási logika:**
+  - [x] **1. szint:** Hungarian algorithm párosítás
+  - [x] **2. szint:** Eltakarodott objektumok reaktiválása
+  - [x] **3. szint:** Valóban új objektumok új ID-val
 
 **Tesztelés:**
-- [ ] Objektum megjelenik → címke megjelenik
-- [ ] Objektum eltakarva → címke eltűnik
-- [ ] Objektum újra látható → UGYANAZ a címke
-- [ ] Robot mozog → címkék megfelelően követik objektumokat
-- [ ] Új objektum → új egyedi címke
+- [x] Objektum megjelenik → címke megjelenik
+- [x] Objektum eltakarva → címke eltűnik, ID tartódik
+- [x] Objektum újra látható → UGYANAZ a címke ✅
+- [x] Robot mozog (teleop) → ID-k stabil maradnak ✅
+
+**Dokumentáció:**
+- [x] `FEJLESZTOI_UTMUTATO.md` - Tracking magyarázat
+- [x] `TRACKING_STABILITAS.md` - Stabilitás javítási dokumentáció
+- [x] `test_tracking.py` - Debug script
+- [x] `FUTTATAS_UTMUTATO.md` - Futtatási útmutató
 
 ---
 

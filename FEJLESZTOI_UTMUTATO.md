@@ -256,35 +256,52 @@ project_mgm/
 
 ---
 
-## ⚙️ Rendszer Működése
+## 🔄 Objektum Tracking és ID Megőrzés
 
-### Architektúra Áttekintés
+Az `ObjectTracker` osztály a **Hungarian Algorithm** segítségével párosítja az objektumokat frame-ek között:
+
+### Működési Logika
 
 ```
-┌─────────────┐
-│   Gazebo    │  (Szimulátor)
-│ TurtleBot3  │
-└──────┬──────┘
-       │ /scan (LaserScan)
-       ▼
-┌─────────────────────┐
-│ lidar_filter_node   │
-│                     │
-│ 1. Szűrés           │  (min/max range)
-│ 2. Pol→Cart transz │  (koordináta konverzió)
-│ 3. Clustering       │  (távolság alapú)
-│ 4. Centroid számít │  (objektum pozíció)
-└──────┬──────────────┘
-       │
-       ├──► /filtered_scan (LaserScan)
-       ├──► /objects (PoseArray)
-       └──► /object_markers (MarkerArray)
-              │
-              ▼
-       ┌──────────┐
-       │  RViz2   │  (Vizualizáció)
-       └──────────┘
+Frame N: Detektálódnak OBJ_0, OBJ_1, OBJ_2
+         ↓
+Frame N+1: Robot mozog → részben takarás
+          - OBJ_0 eltakarodott
+          - OBJ_1, OBJ_2 továbbra is látható
+          - A magyar algoritmus újra párosítja az objektumokat
+          ✅ OBJ_1, OBJ_2 ID-jai megmaradnak
+          ⏱️ OBJ_0 ID-ja 5 másodpercig tartódik (timeout)
+         ↓
+Frame N+2: Robot továbblép
+          - OBJ_0 újra megjelenik!
+          - Mivel < 5 másodperc telt el
+          ✅ OBJ_0 UGYANAZ az ID-kat kapja vissza
 ```
+
+### Paraméterek
+
+- **max_distance:** 0.6m - max távolság az objektumok között a párosításhoz
+  - Teleop gyors mozgásakor lehet 0.8-1.0m szükséges
+- **timeout:** 5.0 sec - meddig tartjuk meg az ID-ját egy eltakarodott objektumnak
+  - Objektum eltakarodott: ID-ja megmarad, de nem jelenik meg RViz-ben
+  - Újramegjelenik < 5 sec alatt: UGYANAZ az ID
+  - > 5 sec: új ID lesz (OBJ_N)
+
+### Tesztelés teleop-pal
+
+```bash
+# Terminal 1
+ros2 launch lidar_filter optimized_system.launch.py
+
+# Terminal 2 - Robot mozgatása
+export TURTLEBOT3_MODEL=waffle
+ros2 run turtlebot3_teleop teleop_keyboard
+```
+
+**Expectált viselkedés:**
+- Robot mozog → objektumok elmozdul, de ID-k maradnak
+- Fa/fal takaródik közébe egy objektumot → ID eltűnik RViz-ből (de tartódik)
+- Objektum újra látható < 5 sec alatt → UGYANAZ az ID! ✅
 
 ### Node Input/Output
 
@@ -302,30 +319,81 @@ project_mgm/
 - `min_cluster_size`: Min pontok száma egy klaszterben (default: 3)
 - `cluster_threshold`: Max távolság pontok között klaszterben (default: 0.2m)
 
-### Objektum Detektálási Algoritmus
+## ⚙️ Rendszer Működése - Részletes
 
-A `lidar_filter_node.py` az alábbi lépéseket hajtja végre:
+### Architektúra Áttekintés
 
-1. **LIDAR Szűrés:**
-   - Érvénytelen távolságok kiszűrése (< min_range vagy > max_range)
-   - Inf értékek használata érvénytelen mérésekhez
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   LIDAR Feldolgozási Pipeline               │
+└─────────────────────────────────────────────────────────────┘
 
-2. **Koordináta Transzformáció:**
-   - Polár (r, θ) → Descartes (x, y) konverzió
-   - x = r × cos(θ), y = r × sin(θ)
+┌─────────────┐
+│   Gazebo    │  Szimulált robot
+│ TurtleBot3  │  LIDAR szenzorral
+└──────┬──────┘
+       │ /scan (LaserScan)
+       │ 360 pont polár koordinátában (r, θ)
+       ▼
+┌────────────────────────────────────────────┐
+│    1. LIDAR SZŰRÉS                         │
+│  • Min/max range (0.1m - 10.0m)            │
+│  • Érvénytelen mérések kiszűrése           │
+│  • Polár → Descartes koordináta (x, y)    │
+└────────────────────────────┬───────────────┘
+                             │
+                             ▼
+┌────────────────────────────────────────────┐
+│    2. DBSCAN CLUSTERING                    │
+│  • eps = 0.2m (pontok max távolsága)       │
+│  • min_samples = 3 (min pontok/klaszter)   │
+│  • Zajszűrés (outlierek kiszűrése)         │
+│  • Centroid számítás (klaszter középpont)  │
+└────────────────────────────┬───────────────┘
+                             │
+                             ▼
+┌────────────────────────────────────────────┐
+│    3. OBJEKTUM TRACKING (HUNGARIAN ALG.)   │
+│  • Régi objektumok ↔ Új detektálások      │
+│  • Távolság mátrix alapján párosítás      │
+│  • Pergisztens ID-k (OBJ_0, OBJ_1, ...)   │
+│  • Timeout: 5 sec eltakarodott obj.        │
+└────────────────────────────┬───────────────┘
+                             │
+          ┌──────────────────┼──────────────────┐
+          │                  │                  │
+          ▼                  ▼                  ▼
+     /filtered_scan      /objects          /object_markers
+   (szűrt LIDAR)      (PoseArray)       (MarkerArray - hengerek)
+                                              │
+                                              ▼
+                                    /object_labels
+                                (MarkerArray - szöveges ID-k)
+                                    OBJ_0, OBJ_1, ...
+                                              │
+                                              ▼
+                                        ┌──────────────┐
+                                        │    RViz2     │
+                                        │ Vizualizáció │
+                                        └──────────────┘
+```
 
-3. **Clustering:**
-   - Egyszerű távolság alapú algoritmus (DBSCAN-szerű)
-   - Közeli pontok (<0.2m) egy klaszterbe kerülnek
-   - Minimum 3 pont szükséges egy érvényes klaszterhez
+### Fő Algoritmusok
 
-4. **Centroid Számítás:**
-   - Klaszter átlagos pozíciója = objektum középpontja
-   - PoseArray üzenetként publikálás
+**1. DBSCAN Clustering** (`sklearn.cluster.DBSCAN`)
+- Sűrűség-alapú klaszterezés
+- Zajszűrés: outlierek label=-1 (eldobjuk)
+- Robusztus több objektumnál
 
-5. **Vizualizáció:**
-   - Piros hengerek (markerek) az objektumok helyén
-   - 1 sec élettartam (automatikus törlődés)
+**2. Hungarian Algorithm** (`scipy.optimize.linear_sum_assignment`)
+- Optimális bipartit gráf párosítás
+- Minimalizálja az össztávolságot
+- Garantálja a legjobb ID párosítást frame-ek között
+
+**3. Objektum Tracking**
+- Perzisztens ID-k: `next_id` számláló
+- Timeout mechanizmus: 5 sec eltakarodott obj.
+- Visible flag: csak látható objektumok jelennek meg RViz-ben
 
 ---
 
