@@ -82,7 +82,7 @@ def generate_launch_description():
             'max_range': 10.0,
             # Clustering beállítások
             'min_cluster_size': 3,
-            'cluster_threshold': 0.2,
+            'cluster_threshold': 0.28,
         }],
     )
     

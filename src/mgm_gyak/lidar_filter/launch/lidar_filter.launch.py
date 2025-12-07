@@ -34,7 +34,7 @@ def generate_launch_description():
             'max_range': 10.0,  # Maximális érvényes távolság (m)
             # Clustering paraméterek
             'min_cluster_size': 3,  # Minimum pontszám egy klaszterben
-            'cluster_threshold': 0.38,  # Max távolság két pont között (m)
+            'cluster_threshold': 0.28,  # Max távolság két pont között (m)
         }],
         remappings=[
             # Topic átnevezések itt adhatók meg ha szükséges

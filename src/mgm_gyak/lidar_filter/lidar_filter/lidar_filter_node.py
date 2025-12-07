@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import math
+import time
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
@@ -9,6 +10,7 @@ from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import PoseArray, Pose
 from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import OccupancyGrid
+from std_msgs.msg import Float32
 
 import numpy as np
 from sklearn.cluster import DBSCAN
@@ -175,6 +177,7 @@ class LidarFilterNode(Node):
         self.map_pub = self.create_publisher(OccupancyGrid, '/map', 10)
         self.markers_pub = self.create_publisher(MarkerArray, '/object_markers', 10)
         self.labels_pub = self.create_publisher(MarkerArray, '/object_labels', 10)
+        self.cpu_time_pub = self.create_publisher(Float32, '/lidar_filter/cpu_time_ms', 10)
 
         # Subscriber
         self.scan_sub = self.create_subscription(
@@ -194,6 +197,7 @@ class LidarFilterNode(Node):
     # -------------------- CALLBACK --------------------
 
     def scan_callback(self, msg: LaserScan):
+        process_start = time.perf_counter()
         # 1. Szűrt LIDAR
         filtered_scan = self.filter_scan(msg)
         self.filtered_scan_pub.publish(filtered_scan)
@@ -220,6 +224,9 @@ class LidarFilterNode(Node):
         # 5. ID címkék a világ frame-ben
         label_markers = self.create_label_markers(visible, frame_id=self.world_frame)
         self.labels_pub.publish(label_markers)
+
+        process_time_ms = (time.perf_counter() - process_start) * 1000.0
+        self.cpu_time_pub.publish(Float32(data=float(process_time_ms)))
 
         if len(visible) > 0:
             self.get_logger().info(
