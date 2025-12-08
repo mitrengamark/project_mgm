@@ -38,10 +38,12 @@ setup(
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
         # RViz konfiguráció fájlok - .rviz fájlok
         (os.path.join('share', package_name, 'config'), glob('config/*.rviz')),
+        # Gazebo world fájlok - .world scriptek
+        (os.path.join('share', package_name, 'worlds'), glob('worlds/*.world')),
     ],
     
     # Függőségek és követelmények
-    install_requires=['setuptools'],  # Build dependency
+    install_requires=['setuptools', 'numpy', 'scikit-learn', 'scipy'],  # Build dependency
     zip_safe=True,  # Csomag zip-elhető (nem tartalmaz C extensionöket)
     
     # Szerző és license információk

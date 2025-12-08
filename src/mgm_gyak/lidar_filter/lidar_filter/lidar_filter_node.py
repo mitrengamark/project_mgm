@@ -1,310 +1,452 @@
 #!/usr/bin/env python3
 
+import math
+import time
 import rclpy
 from rclpy.node import Node
+from rclpy.time import Time
+
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import PoseArray, Pose
 from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import OccupancyGrid
+from std_msgs.msg import Float32
+
 import numpy as np
+from sklearn.cluster import DBSCAN
+from scipy.optimize import linear_sum_assignment
+
+from tf2_ros import Buffer, TransformListener, LookupException, ConnectivityException, ExtrapolationException
+
+
+class ObjectTracker:
+    """
+    Objektum-követő perzisztens ID-kkal (világ frame-ben).
+    """
+
+    def __init__(self, max_distance=1.5, timeout=5.0):
+        # {id: {'position': (x,y), 'last_seen': time, 'visible': bool}}
+        self.tracked_objects = {}
+        self.next_id = 0
+        self.max_distance = max_distance
+        self.timeout = timeout
+
+    def update(self, current_objects, current_time):
+        """
+        current_objects: list[(x,y)]  -> VILÁG (pl. odom) koordinátában!
+        """
+        if len(self.tracked_objects) == 0:
+            for obj in current_objects:
+                self.tracked_objects[self.next_id] = {
+                    'position': obj,
+                    'last_seen': current_time,
+                    'visible': True,
+                }
+                self.next_id += 1
+            return self.get_visible_objects()
+
+        tracked_ids = list(self.tracked_objects.keys())
+        tracked_positions = np.array(
+            [self.tracked_objects[i]['position'] for i in tracked_ids],
+            dtype=float,
+        )
+
+        if len(current_objects) == 0:
+            self.cleanup_old_objects(current_time)
+            return self.get_visible_objects()
+
+        curr = np.array(current_objects, dtype=float)
+
+        # Távolságmátrix régi vs új objektumok között (világ frame-ben)
+        D = np.linalg.norm(tracked_positions[:, None, :] - curr[None, :, :], axis=2)
+
+        # Hungarian assignment – globálisan optimális párosítás
+        row_ind, col_ind = linear_sum_assignment(D)
+
+        assigned_tracked = set()
+        assigned_current = set()
+
+        # 1) párosítható objektumok frissítése
+        for r, c in zip(row_ind, col_ind):
+            if D[r, c] < self.max_distance:
+                obj_id = tracked_ids[r]
+                self.tracked_objects[obj_id]['position'] = tuple(curr[c])
+                self.tracked_objects[obj_id]['last_seen'] = current_time
+                self.tracked_objects[obj_id]['visible'] = True
+                assigned_tracked.add(obj_id)
+                assigned_current.add(c)
+
+        # 2) nem párosított ÚJ objektumok – először próbáljuk "visszatért" objektumként kezelni
+        for idx, obj in enumerate(current_objects):
+            if idx in assigned_current:
+                continue
+
+            obj_np = np.array(obj)
+            found_invisible = False
+
+            for obj_id in tracked_ids:
+                if obj_id in assigned_tracked:
+                    continue
+
+                old_pos = np.array(self.tracked_objects[obj_id]['position'])
+                dist_to_invisible = np.linalg.norm(obj_np - old_pos)
+
+                if dist_to_invisible < self.max_distance * 1.5 and not self.tracked_objects[obj_id]['visible']:
+                    # Visszatért egy korábban eltűnt objektum (kicsit engedékenyebb küszöbbel)
+                    self.tracked_objects[obj_id]['position'] = tuple(obj)
+                    self.tracked_objects[obj_id]['last_seen'] = current_time
+                    self.tracked_objects[obj_id]['visible'] = True
+                    assigned_tracked.add(obj_id)
+                    assigned_current.add(idx)
+                    found_invisible = True
+                    break
+
+            if not found_invisible:
+                # Tényleg új objektum
+                self.tracked_objects[self.next_id] = {
+                    'position': obj,
+                    'last_seen': current_time,
+                    'visible': True,
+                }
+                self.next_id += 1
+
+        # 3) Azok, amik most nem kaptak match-et, eltűntnek számítanak
+        for obj_id in tracked_ids:
+            if obj_id not in assigned_tracked:
+                self.tracked_objects[obj_id]['visible'] = False
+
+        self.cleanup_old_objects(current_time)
+        return self.get_visible_objects()
+
+    def get_visible_objects(self):
+        result = []
+        for obj_id, data in self.tracked_objects.items():
+            if data['visible']:
+                x, y = data['position']
+                result.append((obj_id, x, y))
+        return result
+
+    def cleanup_old_objects(self, current_time):
+        to_delete = []
+        for obj_id, data in self.tracked_objects.items():
+            if current_time - data['last_seen'] > self.timeout:
+                to_delete.append(obj_id)
+
+        for d in to_delete:
+            del self.tracked_objects[d]
 
 
 class LidarFilterNode(Node):
     """
-    LIDAR-based object detection and tracking node.
-    
-    Subscribes to /scan topic and publishes:
-    - /filtered_scan: filtered LIDAR data
-    - /objects: detected objects as PoseArray
-    - /map: occupancy grid map
+    LIDAR alapú objektum detektálás + követés:
+
+    - /scan -> szűrés -> klaszterezés (DBSCAN)
+    - fal jellegű klaszterek kiszűrése (túl nagy, túl hosszú, túl sok pont)
+    - klaszter centerek WORLD (pl. odom) frame-be transzformálása tf-fel
+    - ObjectTracker perzisztens ID-kkel
+    - RViz marker + TEXT_LABEL output
     """
 
     def __init__(self):
-        """Node inicializálása - Publishers, Subscribers és paraméterek beállítása."""
         super().__init__('lidar_filter_node')
-        
-        # Publishers - Kimeneti topic-ok létrehozása
-        # /filtered_scan: Szűrt LIDAR adatok (érvénytelen értékek eltávolítva)
+
+        # TF buffer a LIDAR frame -> world frame (pl. odom) transzformációhoz
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
+        # Paraméterek
+        self.declare_parameter('min_range', 0.1)
+        self.declare_parameter('max_range', 10.0)
+        self.declare_parameter('min_cluster_size', 3)
+        self.declare_parameter('cluster_threshold', 0.28)   # DBSCAN eps
+        self.declare_parameter('dbscan_min_samples', None)
+
+        # Fal-szűrés paraméterek
+        # Ha ezek bármelyikét túllépi egy klaszter, fal-szerűnek tekintjük
+        self.declare_parameter('max_object_diameter', 1.2)     # m – körülbelüli "átmérő"
+        self.declare_parameter('max_object_length', 1.0)       # m – klaszter hossza
+        self.declare_parameter('max_cluster_points', 80)       # pontszám limit
+
+        # világ frame, amiben trackelünk (odom vagy map)
+        self.declare_parameter('world_frame', 'odom')
+        self.world_frame = self.get_parameter('world_frame').value
+
+        # Publisher-ek
         self.filtered_scan_pub = self.create_publisher(LaserScan, '/filtered_scan', 10)
-        # /objects: Detektált objektumok pozíciói PoseArray formátumban
         self.objects_pub = self.create_publisher(PoseArray, '/objects', 10)
-        # /map: Occupancy grid térkép (jelenleg nem használt)
         self.map_pub = self.create_publisher(OccupancyGrid, '/map', 10)
-        # /object_markers: Vizualizációs markerek RViz-hez
         self.markers_pub = self.create_publisher(MarkerArray, '/object_markers', 10)
-        
-        # Subscriber - Feliratkozás a LIDAR /scan topic-ra
-        # A TurtleBot3 folyamatosan publikálja a LIDAR méréseket erre a topic-ra
+        self.labels_pub = self.create_publisher(MarkerArray, '/object_labels', 10)
+        self.cpu_time_pub = self.create_publisher(Float32, '/lidar_filter/cpu_time_ms', 10)
+
+        # Subscriber
         self.scan_sub = self.create_subscription(
             LaserScan,
             '/scan',
             self.scan_callback,
-            10  # QoS queue méret - utolsó 10 üzenet bufferelése
+            10
         )
-        
-        # Parameters - Konfigurálható paraméterek definiálása
-        # min_range: Minimális érvényes távolság (m) - közelebbi pontok kiszűrése
-        self.declare_parameter('min_range', 0.1)
-        # max_range: Maximális érvényes távolság (m) - távolabbi pontok kiszűrése
-        self.declare_parameter('max_range', 10.0)
-        # min_cluster_size: Minimum pontok száma egy érvényes klaszterben
-        self.declare_parameter('min_cluster_size', 3)
-        # cluster_threshold: Maximális távolság (m) két pont között egy klaszterben
-        self.declare_parameter('cluster_threshold', 0.2)
-        
-        self.get_logger().info('LIDAR Filter Node initialized')
 
-    def scan_callback(self, msg):
-        """
-        LIDAR scan callback függvény - minden beérkező scan-re meghívódik.
-        
-        Működés:
-        1. Szűri a nyers LIDAR adatokat (távolság alapján)
-        2. Detektálja az objektumokat clustering algoritmussal
-        3. Létrehozza a vizualizációs markereket
-        4. Publikálja az eredményeket a megfelelő topic-okra
-        
-        Args:
-            msg (LaserScan): Beérkező LIDAR scan üzenet a TurtleBot3-tól
-        """
-        # 1. Scan szűrés - Érvénytelen értékek (túl közeli/távoli) kiszűrése
+        # Tracker (kicsit engedékenyebb távolsággal)
+        self.tracker = ObjectTracker(max_distance=1.5, timeout=5.0)
+
+        self.get_logger().info('LIDAR Filter Node (DBSCAN + Tracker) initialized')
+        self.get_logger().info('Publishing: /filtered_scan, /objects, /object_markers, /object_labels')
+        self.get_logger().info(f'World frame for tracking: {self.world_frame}')
+
+    # -------------------- CALLBACK --------------------
+
+    def scan_callback(self, msg: LaserScan):
+        process_start = time.perf_counter()
+        # 1. Szűrt LIDAR
         filtered_scan = self.filter_scan(msg)
         self.filtered_scan_pub.publish(filtered_scan)
-        
-        # 2. Objektum detektálás - Klaszterezés és centroid számítás
+
+        # 2. Objektum detektálás (DBSCAN + fal-szűrés)
         objects = self.detect_objects(filtered_scan)
         self.objects_pub.publish(objects)
-        
-        # 3. Vizualizációs markerek létrehozása RViz-hez
+
+        # 3. Henger markerek (lokális LIDAR frame-ben)
         markers = self.create_markers(objects)
         self.markers_pub.publish(markers)
-        
-        # Debug log - Detektált objektumok száma
-        self.get_logger().debug(f'Detected {len(objects.poses)} objects')
 
-    def filter_scan(self, scan):
-        """
-        LIDAR scan adatok szűrése távolság alapján.
-        
-        Eltávolítja az érvénytelen méréseket:
-        - Túl közeli pontok (< min_range): sensor zaj, robot teste
-        - Túl távoli pontok (> max_range): megbízhatatlan mérések
-        
-        Args:
-            scan (LaserScan): Nyers LIDAR scan
-            
-        Returns:
-            LaserScan: Szűrt scan, érvénytelen értékek inf-re állítva
-        """
-        # Paraméterek lekérése a konfigurációból
+        # 4. Centerek átvitele WORLD frame-be + tracking
+        centroids_local = [(p.position.x, p.position.y) for p in objects.poses]
+        centroids_world = self.transform_points_to_world(
+            centroids_local,
+            header_frame=objects.header.frame_id,
+            stamp=objects.header.stamp
+        )
+
+        now = self.get_clock().now().nanoseconds * 1e-9
+        visible = self.tracker.update(centroids_world, now)
+
+        # 5. ID címkék a világ frame-ben
+        label_markers = self.create_label_markers(visible, frame_id=self.world_frame)
+        self.labels_pub.publish(label_markers)
+
+        process_time_ms = (time.perf_counter() - process_start) * 1000.0
+        self.cpu_time_pub.publish(Float32(data=float(process_time_ms)))
+
+        if len(visible) > 0:
+            self.get_logger().info(
+                f'Tracking {len(visible)} objects with IDs: {[obj_id for obj_id, _, _ in visible]}',
+                throttle_duration_sec=1.0
+            )
+
+    # -------------------- LIDAR SZŰRÉS --------------------
+
+    def filter_scan(self, scan: LaserScan) -> LaserScan:
         min_range = self.get_parameter('min_range').value
         max_range = self.get_parameter('max_range').value
-        
-        # Új LaserScan üzenet létrehozása
+
         filtered = LaserScan()
-        # Metaadatok másolása az eredeti scan-ből
         filtered.header = scan.header
-        filtered.angle_min = scan.angle_min  # Kezdő szög (radián)
-        filtered.angle_max = scan.angle_max  # Záró szög (radián)
-        filtered.angle_increment = scan.angle_increment  # Szög lépésköz
-        filtered.time_increment = scan.time_increment  # Időkülönbség mérések között
-        filtered.scan_time = scan.scan_time  # Teljes scan idő
+        filtered.angle_min = scan.angle_min
+        filtered.angle_max = scan.angle_max
+        filtered.angle_increment = scan.angle_increment
+        filtered.time_increment = scan.time_increment
+        filtered.scan_time = scan.scan_time
         filtered.range_min = min_range
         filtered.range_max = max_range
-        
-        # Távolság értékek szűrése - tartományon kívüli értékek inf-re
-        # inf érték jelzi hogy nincs érvényes mérés az adott szögben
+
         filtered.ranges = [
             r if min_range <= r <= max_range else float('inf')
             for r in scan.ranges
         ]
-        filtered.intensities = scan.intensities  # Intenzitás értékek megtartása
-        
+        filtered.intensities = scan.intensities
+
         return filtered
 
-    def detect_objects(self, scan):
-        """
-        Objektumok detektálása szűrt LIDAR scan-ből clustering használatával.
-        
-        Algoritmus lépései:
-        1. Polár koordináták (távolság, szög) -> Descartes koordinátákra (x, y)
-        2. Közeli pontok klaszterezése (távolság alapú)
-        3. Klaszter centroidok számítása -> objektum pozíciók
-        
-        Args:
-            scan (LaserScan): Szűrt LIDAR scan
-            
-        Returns:
-            PoseArray: Detektált objektumok pozíciói (robothoz képest)
-        """
-        # Clustering paraméterek lekérése
+    # -------------------- OBJEKTUM DETEKTÁLÁS + FAL-SZŰRÉS --------------------
+
+    def detect_objects(self, scan: LaserScan) -> PoseArray:
         min_cluster_size = self.get_parameter('min_cluster_size').value
         cluster_threshold = self.get_parameter('cluster_threshold').value
-        
-        # 1. Polár -> Descartes koordináta transzformáció
-        # LIDAR polár koordinátákat ad: (távolság, szög)
-        # Objektum detektáláshoz Descartes koordináták kellenek: (x, y)
+        dbscan_min_samples = self.get_parameter('dbscan_min_samples').value
+        if dbscan_min_samples is None:
+            dbscan_min_samples = min_cluster_size
+
+        max_object_diameter = self.get_parameter('max_object_diameter').value
+        max_object_length = self.get_parameter('max_object_length').value
+        max_cluster_points = self.get_parameter('max_cluster_points').value
+
         points = []
         for i, r in enumerate(scan.ranges):
-            # Érvényes mérések kiválasztása (nem inf és nem NaN)
             if not np.isinf(r) and not np.isnan(r):
-                # Szög kiszámítása: kezdő szög + index * lépésköz
                 angle = scan.angle_min + i * scan.angle_increment
-                # Polár -> Descartes konverzió
-                x = r * np.cos(angle)  # x koordináta (előre)
-                y = r * np.sin(angle)  # y koordináta (oldalt)
+                x = r * math.cos(angle)
+                y = r * math.sin(angle)
                 points.append([x, y])
-        
-        # Ha nincs érvényes pont, üres PoseArray visszaadása
-        if len(points) == 0:
-            return PoseArray(header=scan.header)
-        
-        points = np.array(points)  # Lista -> NumPy array (gyorsabb számítás)
-        
-        # 2. Távolság alapú clustering - közeli pontok csoportosítása
-        clusters = self.simple_clustering(points, cluster_threshold, min_cluster_size)
-        
-        # 3. PoseArray létrehozása klaszter centroidokból
+
         pose_array = PoseArray()
-        pose_array.header = scan.header  # Időbélyeg és koordináta-rendszer
-        
+        pose_array.header = scan.header
+
+        if len(points) == 0:
+            return pose_array
+
+        points = np.array(points, dtype=float)
+
+        # DBSCAN klaszterezés
+        clusters = self.dbscan_clustering(points, eps=cluster_threshold, min_samples=dbscan_min_samples)
+
         for cluster in clusters:
-            # Centroid = klaszter átlagos pozíciója -> objektum közepe
+            num_pts = len(cluster)
+            if num_pts < min_cluster_size:
+                continue
+
+            # Klaszter kiterjedés (axis-aligned bounding box + "átmérő")
+            xs = cluster[:, 0]
+            ys = cluster[:, 1]
+            dx = float(xs.max() - xs.min())
+            dy = float(ys.max() - ys.min())
+            length = math.hypot(dx, dy)       # megközelítő hossz
+            width = min(abs(dx), abs(dy))     # megközelítő "vastagság"
+
             centroid = np.mean(cluster, axis=0)
+            radii = np.linalg.norm(cluster - centroid, axis=1)
+            diameter = float(radii.max() * 2.0)
+
+            # Fal jellegű klaszter: nagyon hosszú, vagy nagy átmérő, vagy rengeteg pont
+            is_wall_like = (
+                length > max_object_length or
+                diameter > max_object_diameter or
+                num_pts > max_cluster_points
+            )
+
+            if is_wall_like:
+                # Debug/log (ha szeretnéd látni, mit dob ki):
+                # self.get_logger().debug(f'Filtering wall-like cluster: len={length:.2f}, dia={diameter:.2f}, pts={num_pts}')
+                continue
+
+            # --- Klaszter centroid ---
             pose = Pose()
-            pose.position.x = centroid[0]  # x pozíció (m)
-            pose.position.y = centroid[1]  # y pozíció (m)
-            pose.position.z = 0.0  # z = 0 (2D síkban)
-            pose.orientation.w = 1.0  # Egység quaternion (nincs forgatás)
+            pose.position.x = float(centroid[0])
+            pose.position.y = float(centroid[1])
+            pose.position.z = 0.0
+            pose.orientation.w = 1.0
             pose_array.poses.append(pose)
-        
+
         return pose_array
 
-    def simple_clustering(self, points, threshold, min_size):
-        """
-        Egyszerű távolság alapú clustering algoritmus.
-        
-        Működés:
-        - Végigmegy minden ponton
-        - Klasztert épít a küszöbértéken belüli közeli pontokból
-        - Csak a minimum méretnél nagyobb klasztereket tartja meg
-        
-        Ez egy egyszerűsített DBSCAN-szerű megközelítés:
-        - Nem használ core points koncepciót
-        - Csak szomszédsági távolságot néz
-        
-        Args:
-            points (np.array): 2D pontok tömbje [[x1,y1], [x2,y2], ...]
-            threshold (float): Maximális távolság (m) két pont között egy klaszterben
-            min_size (int): Minimum pontok száma egy érvényes klaszterhez
-            
-        Returns:
-            list: Klaszterek listája, mindegyik egy NumPy array pontokkal
-        """
-        if len(points) == 0:
+    def dbscan_clustering(self, points, eps=0.2, min_samples=3):
+        if len(points) < min_samples:
             return []
-        
-        clusters = []  # Talált klaszterek
-        visited = np.zeros(len(points), dtype=bool)  # Feldolgozott pontok jelzése
-        
-        # Minden pont feldolgozása
-        for i in range(len(points)):
-            if visited[i]:  # Már feldolgozott pont kihagyása
+
+        clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(points)
+        labels = clustering.labels_
+
+        clusters = []
+        for label in set(labels):
+            if label == -1:
                 continue
-            
-            # Új klaszter indítása az aktuális ponttal
-            cluster = [points[i]]
-            visited[i] = True
-            
-            # Klaszter növesztése - közeli pontok hozzáadása
-            for j in range(i + 1, len(points)):
-                if visited[j]:  # Már feldolgozott pont kihagyása
-                    continue
-                
-                # Távolság ellenőrzése a klaszter bármely pontjától
-                # Ha van közeli pont a klaszterben -> hozzáadás
-                for point in cluster:
-                    dist = np.linalg.norm(points[j] - point)  # Euklideszi távolság
-                    if dist < threshold:
-                        cluster.append(points[j])
-                        visited[j] = True
-                        break  # Elég egy közeli pont, tovább a következő j-re
-            
-            # Csak elég nagy klasztereket tartjuk meg
-            # Kis klaszterek = zaj, nem valós objektumok
-            if len(cluster) >= min_size:
-                clusters.append(np.array(cluster))
-        
+            clusters.append(points[labels == label])
+
         return clusters
 
-    def create_markers(self, objects):
+    # -------------------- WORLD FRAME TRANSZFORM --------------------
+
+    def transform_points_to_world(self, points_xy, header_frame: str, stamp):
         """
-        Vizualizációs markerek létrehozása RViz-hez.
-        
-        Minden detektált objektumhoz egy piros hengert hoz létre,
-        amely RViz-ben megjeleníthető. Ez segít debug-olni és
-        demonstrálni az objektum detektálást.
-        
-        Args:
-            objects (PoseArray): Detektált objektumok pozíciói
-            
-        Returns:
-            MarkerArray: Vizualizációs markerek tömbje RViz-hez
+        LIDAR frame-ből (pl. base_scan) világ frame-be (pl. odom) transzformálja a 2D pontokat.
         """
+        if not points_xy:
+            return []
+
+        try:
+            t = self.tf_buffer.lookup_transform(
+                self.world_frame,
+                header_frame,
+                Time()  # egyszerűbb: "legutóbbi" TF
+            )
+        except (LookupException, ConnectivityException, ExtrapolationException) as ex:
+            self.get_logger().warn(
+                f'Cannot transform {header_frame} -> {self.world_frame}: {ex}',
+                throttle_duration_sec=1.0
+            )
+            # Fallback: maradjon LIDAR frame-ben (kevésbé stabil ID, de nem hal le a rendszer)
+            return points_xy
+
+        trans = t.transform.translation
+        rot = t.transform.rotation
+
+        yaw = self._yaw_from_quaternion(rot)
+        cos_y = math.cos(yaw)
+        sin_y = math.sin(yaw)
+
+        world_points = []
+        for x, y in points_xy:
+            wx = cos_y * x - sin_y * y + trans.x
+            wy = sin_y * x + cos_y * y + trans.y
+            world_points.append((wx, wy))
+
+        return world_points
+
+    @staticmethod
+    def _yaw_from_quaternion(q):
+        siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+        cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+        return math.atan2(siny_cosp, cosy_cosp)
+
+    # -------------------- MARKEREK --------------------
+
+    def create_markers(self, objects: PoseArray) -> MarkerArray:
         marker_array = MarkerArray()
-        
-        # Minden objektumhoz egy marker létrehozása
         for i, pose in enumerate(objects.poses):
             marker = Marker()
-            marker.header = objects.header  # Időbélyeg és koordináta-rendszer
-            marker.ns = "objects"  # Namespace - marker csoportosításhoz
-            marker.id = i  # Egyedi ID - marker azonosításhoz és frissítéshez
-            marker.type = Marker.CYLINDER  # Forma: henger (objektumot reprezentál)
-            marker.action = Marker.ADD  # Művelet: marker hozzáadása/frissítése
-            marker.pose = pose  # Pozíció és orientáció
-            
-            # Marker mérete
-            marker.scale.x = 0.2  # Átmérő X irányban (m)
-            marker.scale.y = 0.2  # Átmérő Y irányban (m)
-            marker.scale.z = 0.5  # Magasság (m)
-            
-            # Marker színe - piros, félig átlátszó
-            marker.color.r = 1.0  # Piros csatorna
-            marker.color.g = 0.0  # Zöld csatorna
-            marker.color.b = 0.0  # Kék csatorna
-            marker.color.a = 0.8  # Alpha (átlátszóság, 0=teljesen átlátszó, 1=teljesen tömör)
-            
-            # Élettartam - 1 sec után automatikusan törlődik
-            # Ez biztosítja hogy eltűnő objektumok markerei ne maradjanak
+            marker.header = objects.header
+            marker.ns = "objects"
+            marker.id = i
+            marker.type = Marker.CYLINDER
+            marker.action = Marker.ADD
+            marker.pose = pose
+            marker.scale.x = 0.2
+            marker.scale.y = 0.2
+            marker.scale.z = 0.5
+            marker.color.r = 1.0
+            marker.color.g = 0.0
+            marker.color.b = 0.0
+            marker.color.a = 0.8
             marker.lifetime.sec = 1
-            
             marker_array.markers.append(marker)
-        
         return marker_array
+
+    def create_label_markers(self, visible_objects, frame_id="odom") -> MarkerArray:
+        """
+        visible_objects: list[(id, x, y)] – VILÁG frame-ben!
+        """
+        arr = MarkerArray()
+        for obj_id, x, y in visible_objects:
+            m = Marker()
+            m.header.frame_id = frame_id
+            m.header.stamp = self.get_clock().now().to_msg()
+            m.ns = "object_labels"
+            m.id = int(obj_id)
+            m.type = Marker.TEXT_VIEW_FACING
+            m.action = Marker.ADD
+            m.text = f"OBJ_{obj_id}"
+            m.pose.position.x = float(x)
+            m.pose.position.y = float(y)
+            m.pose.position.z = 0.5
+            m.pose.orientation.w = 1.0
+            m.scale.z = 0.3
+            m.color.r = 1.0
+            m.color.g = 1.0
+            m.color.b = 0.2
+            m.color.a = 1.0
+            m.lifetime.sec = 1
+            arr.markers.append(m)
+        return arr
 
 
 def main(args=None):
-    """
-    Fő belépési pont a node futtatásához.
-    
-    Inicializálja a ROS2 környezetet, létrehozza a node-ot,
-    és futtatja amíg nem érkezik leállítási jel (Ctrl+C).
-    """
-    # ROS2 környezet inicializálása
     rclpy.init(args=args)
-    
-    # LIDAR filter node létrehozása
     node = LidarFilterNode()
-    
     try:
-        # Node futtatása - folyamatosan dolgozza fel a beérkező üzeneteket
-        # Ez egy blokkoló hívás, amíg a node fut
         rclpy.spin(node)
     except KeyboardInterrupt:
-        # Ctrl+C kezelése - tiszta leállás
         pass
     finally:
-        # Cleanup - erőforrások felszabadítása
         node.destroy_node()
         rclpy.shutdown()
 

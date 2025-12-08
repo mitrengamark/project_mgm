@@ -70,7 +70,7 @@ def generate_launch_description():
             'max_range': 10.0,  # 10 m maximum távolság
             # Clustering beállítások
             'min_cluster_size': 3,  # Legalább 3 pont = 1 objektum
-            'cluster_threshold': 0.2,  # 20 cm max távolság pontok között
+            'cluster_threshold': 0.28,  # 20 cm max távolság pontok között
         }],
     )
     
