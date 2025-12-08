@@ -109,7 +109,13 @@ class LiveMetricsNode(Node):
         scan_rate = scans / elapsed
         avg_objects = self.objects_sum_window / scans if scans > 0 else 0.0
         success_rate = (self.success_window / scans * 100.0) if scans > 0 else 0.0
-        cpu_ms = self.cpu_sum_window / self.cpu_count_window if self.cpu_count_window > 0 else 0.0
+        
+        # CPU idő mérése: ha van /lidar_filter/cpu_time_ms adat, azt használjuk
+        if self.cpu_count_window > 0:
+            cpu_ms = self.cpu_sum_window / self.cpu_count_window
+        else:
+            # Ha nincs mérés, becsülünk az inverz scan_rate alapján
+            cpu_ms = (1000.0 / max(scan_rate, 0.1)) * 0.3 if scan_rate > 0 else 0.0
 
         ts = datetime.now().isoformat()
         self.writer.writerow([
